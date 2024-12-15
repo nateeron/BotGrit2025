@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from Function.Routes.routes import price_router
 from Function.Routes.routes_ConfigBot import r_ConfigBot
+from Function.Routes.routes_infoPrice import r_infoPrice
 
 
 import uvicorn
@@ -11,6 +12,7 @@ app = FastAPI()
 # Include the router for price-related endpoints
 app.include_router(price_router)
 app.include_router(r_ConfigBot)
+app.include_router(r_infoPrice)
 
 
 @app.on_event("startup")
