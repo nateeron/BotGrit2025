@@ -46,8 +46,11 @@ Table
 -ConfigBot
 	-StrategyName
 	-PercenBuy
+	-PercenBuy
 	-PercenSell
 	-DateCreate
 	-DateUpdate
+
+	
 UI
 React+Vit TypeScrip Port: 45442

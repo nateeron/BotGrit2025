@@ -1,6 +1,6 @@
 from bson import ObjectId
 from pymongo.collection import Collection
-
+from Function.MongoDatabase import db
 # Helper function to convert MongoDB document to dictionary
 def document_to_dict(doc):
     return {
@@ -34,3 +34,12 @@ def delete_price(collection: Collection, id: str):
     return result.deleted_count > 0
 
 
+def create_tables():
+    """
+    Create MongoDB collections (tables) for the required structure.
+    """
+    # Create collections if they do not exist
+    for collection_name in ["XRPUSDT_1m", "BNBUSDT_1m", "OrderBuy", "ConfigBot"]:
+        if collection_name not in db.list_collection_names():
+            db.create_collection(collection_name)
+            print(f"Collection {collection_name} created.")

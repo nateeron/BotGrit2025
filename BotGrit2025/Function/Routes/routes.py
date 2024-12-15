@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException
 # from typing import List
-from Function.MongoDatabase import collection,DB
+from Function.MongoDatabase import db
 
-from Function.models import PriceData, PriceResponse,reqCollection_Name,req
+from Function.Models.models import PriceData, PriceResponse,reqCollection_Name,req
 # from crud import create_price, read_prices, read_price, update_price, delete_price
+
 
 price_router = APIRouter()
 @price_router.get("/")
@@ -12,6 +13,7 @@ def okRun():
 
 # @price_router.post("/prices", response_model=PriceResponse)
 # async def create_price_endpoint(data: PriceData):
+#     collection = 'BNBUSDT_1m'
 #     result = create_price(collection, data.dict())
 #     if not result:
 #         raise HTTPException(status_code=500, detail="Failed to create record")
@@ -40,15 +42,13 @@ def okRun():
 #         raise HTTPException(status_code=404, detail="Record not found")
 #     return {"message": "Record deleted successfully"}
 
-
-
-@price_router.post("/create_collection")
-async def create_collection(req: reqCollection_Name):
-      print("--------------------------------")
-      print(req.name) # collection_name
-      if req.name in DB.list_collection_names(req):
-           return {"message": f"Collection '{req.name}' already exists."}
-      # DB.create_collection(collection_name)
-      print("--------------[END]------------------")
-      
-      return {"message": f"Collection '{req}' created successfully."}
+@price_router.post("/createTable")
+async def create_table():
+    """
+    Create MongoDB collections (tables) for the required structure.
+    """
+    # Create collections if they do not exist
+    for collection_name in ["XRPUSDT_1m", "BNBUSDT_1m", "OrderBuy", "ConfigBot"]:
+        if collection_name not in db.list_collection_names():
+            db.create_collection(collection_name)
+            print(f"Collection {collection_name} created.")
