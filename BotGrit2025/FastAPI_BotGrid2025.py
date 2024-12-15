@@ -7,7 +7,9 @@ from Function.Routes.routes_infoPrice import r_infoPrice
 import uvicorn
 
 
+
 app = FastAPI()
+
 
 # Include the router for price-related endpoints
 app.include_router(price_router)
