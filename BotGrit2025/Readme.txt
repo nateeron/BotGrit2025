@@ -1,5 +1,5 @@
 pip install fastapi sqlalchemy sqlite
-
+https://miro.com/app/board/uXjVMgAbORM=/
 FAST API
 [API] Port 45441
 
