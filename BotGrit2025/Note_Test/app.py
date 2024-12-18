@@ -111,7 +111,8 @@ def initialize_tables():
             "PercenBuy": 0.1,
             "PercenSell": 0.1,
             "DateCreate": datetime.utcnow(),
-            "DateUpdate": datetime.utcnow()
+            "DateUpdate": datetime.utcnow(),
+            "Isactive": True,
         })
 
 if __name__ == "__main__":

@@ -1,0 +1,106 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lightweight Charts with Binance WebSocket Data</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
+</head>
+
+<body>
+    <style>
+        #chart1 {
+            width: 100%;
+            height: 50vh;
+        }
+    
+        body {
+            color: aliceblue;
+            background-color: #222;
+        }
+    
+        /* Custom tooltip style */
+        .custom-tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            display: none;
+        }
+    </style>
+    
+    <div>
+        <label for="timeframe">Select Timeframe:</label>
+        <select id="timeframe">
+            <option value="1m">1 Minute</option>
+            <option value="15m">15 Minutes</option>
+            <option value="30m">30 Minutes</option>
+            <option value="1h">1 Hour</option>
+            <option value="2h">2 Hours</option>
+            <option value="4h">4 Hours</option>
+            <option value="1d">1 Day</option>
+        </select>
+    </div>
+    
+    <div id="chart1"></div>
+    <div class="custom-tooltip" id="custom-tooltip"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@3.6.0/dist/lightweight-charts.standalone.production.js"></script>
+    
+    <script>
+        const chartOptions = {
+            layout: {
+                textColor: '#E4E4E4',
+                background: { type: 'solid', color: '#202020' },
+            },
+            timeScale: {
+                timeVisible: true,
+                secondsVisible: false,
+                tickMarkFormatter: (time, tickMarkType, locale) => {
+                    const bangkokTime = new Intl.DateTimeFormat('en-US', {
+                        timeZone: 'Asia/Bangkok',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                    }).format(new Date(time * 1000));
+                    return bangkokTime;
+                },
+            },
+        };
+    
+        const rawData = [
+            { time: 1734495180000, open: 100, high: 110, low: 95, close: 105 },
+            { time: 1734495240000, open: 105, high: 115, low: 100, close: 110 },
+        ];
+    
+        // Convert timestamps from milliseconds to seconds
+        const formattedData = rawData.map(item => ({
+            time: Math.floor(item.time / 1000), // Convert milliseconds to seconds
+            open: item.open,
+            high: item.high,
+            low: item.low,
+            close: item.close,
+        }));
+    
+        // Set the formatted data to the chart
+        const container = document.getElementById('chart1');
+        const chart = LightweightCharts.createChart(container, chartOptions);
+    
+        const series = chart.addCandlestickSeries();
+        series.setData(formattedData);
+    
+        chart.timeScale().fitContent();
+    
+       
+       
+    </script>
+    
+    
+</body>
+</html>

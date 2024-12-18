@@ -2,14 +2,26 @@ from fastapi import FastAPI
 from Function.Routes.routes import price_router
 from Function.Routes.routes_ConfigBot import r_ConfigBot
 from Function.Routes.routes_infoPrice import r_infoPrice
-
+from fastapi.middleware.cors import CORSMiddleware
 
 import uvicorn
 
 
 
 app = FastAPI()
+origins = [
+    "http://127.0.0.1:5500",  # Allow requests from this origin (you can add more as needed)
+    "http://localhost:5500",   # Another example for localhost
+]
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # Allow only specific origins
+    allow_credentials=True,
+    allow_methods=["*"],    # Allow all HTTP methods
+    allow_headers=["*"],    # Allow all headers
+)
 
 # Include the router for price-related endpoints
 app.include_router(price_router)

@@ -1,7 +1,8 @@
 from fastapi import APIRouter,HTTPException
 from Function.Models.model_routes_infoPrice import req_getprice
-from Function.Service.sv_infoPrice import LoadPrice
+from Function.Service.sv_infoPrice import LoadPrice,load_date,getprice_Api,load_data,dateTime_To_timestamp
 import json
+from datetime import datetime,timedelta
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from bson import ObjectId
@@ -28,9 +29,9 @@ def getprice(req: req_getprice):
             "symbol":"XRPUSDT",
             "tf":"1m",
             "getAll": false,
-            "datefrom":"10-02-2025",
-            "dateto":"10-03-2025",
-            "ohcl":"c"
+            "datefrom":"18-12-2024",
+            "dateto":"18-12-2025",
+            "ohlc":"ohlc"
         }
         """
         resp= []
@@ -41,3 +42,30 @@ def getprice(req: req_getprice):
         print(resps)
         
         return resps
+@r_infoPrice.get("/infoPrice/date")
+def get_ValibleDateData():
+    print(" sss")
+    resp = load_date('XRPUSDT_1m')
+    
+    print(resp)
+    ## resp_converted = convert_objectid(resp)
+    ## #
+    ## resps = JSONResponse(content=resp_converted)
+    return resp
+
+
+@r_infoPrice.get("/infoPrice/getprice")
+def get_price():
+    print(" get_price")
+    symbol = 'XRPUSDT'
+    interval = '1m'
+    limit ='2'
+    
+    current_time = dateTime_To_timestamp(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) - 1*60*60
+    resp = load_data(symbol, interval, limit, current_time)
+    
+    print(resp)
+    #resp_converted = convert_objectid(resp)
+    ## #
+    #resps = JSONResponse(content=resp_converted)
+    return resp
