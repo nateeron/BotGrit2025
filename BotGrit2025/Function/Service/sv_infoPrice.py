@@ -44,7 +44,7 @@ def load_date(table):
                     ]
     """
     # Retrieve documents from MongoDB collection
-    resp = list(db[table].find({}, {"timestamp": 1,"Create_Date":1, "close": 1}).sort("Create_Date", -1))
+    resp = list(db[table].find({}, {"timestamp": 1,"Create_Date":1, "close": 1}).sort("timestamp", -1))
     # Map over the response and convert timestamp
     result = []
 
@@ -114,10 +114,12 @@ def LoadPrice(req:req_getprice):
     # ถ้า ไม่มี data ให้ Getdata
     if resp == []:
     #if True:
-        lastEndTime = 0
+    
+        starttime = 0
+        endtime = 0
         lengtbar_ = 3
         limit_ = 3
-        get_data(req,req.symbol,lengtbar_,limit_,lastEndTime)
+        get_data(req,req.symbol,lengtbar_,limit_,starttime ,endtime)
         resp = list(db[table_collection].find())
     else:
         # Load Update Price
@@ -152,7 +154,7 @@ def LoadPrice(req:req_getprice):
         limit_ = 1000 if calbar >= 1000 else calbar
         starttime = req_strptime_start
         endtime = req_strptime_start
-        #get_data(req,req.symbol,lengtbar_,limit_,starttime ,endtime)
+        get_data(req,req.symbol,lengtbar_,limit_,starttime ,endtime)
         
      
     return resp
@@ -210,7 +212,7 @@ def load_data_SETTime(symbol, interval, limit, lastEndTime):
 
 ########################################################################################################
 ########################################################################################################
-def load_data(symbol, interval, limit, startTime,EndTime):
+def load_data(symbol, interval, limit, startTime,endtime):
     ''' symbol = 'XRPUSDT', 
         interval = '1m', 
         limit = 1000, 
@@ -245,8 +247,8 @@ def load_data(symbol, interval, limit, startTime,EndTime):
         
     if startTime != 0 and 1==1:
         params['startTime'] = startTime
-    if EndTime != 0 and 1==1:
-        params['endTime'] = EndTime
+    if endtime != 0 and 1==1:
+        params['endTime'] = endtime
     response = requests.get(base_url, params=params)
     data = []
     if response.status_code == 200:
@@ -327,6 +329,11 @@ def insert(table_collection, data):
 ########################################################################################################
 
 def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_ ,starttime = 0 ,endtime = 0):
+    """
+        - ถ้า จำนวน lengtbar_ < 1000 จะไม่กระจาย Load จะ Load ทีเดียว  จะ Load โดยใช้ End Time
+        - ถ้า จำนวน lengtbar_ > 1000  จะ คำนวนเวลา แล้วกระจาย Load 
+        - รอบสุดท้ายที่กระจาย Load จะมีเศษ bar ไม่ถึง 1000 จะ Load โดยใช้ End Time
+    """
     print('------------------------------------------------------------')
     print('get_data : ',lengtbar_ ,limit_ ,starttime)
     print('get_data CaldateTime: ',CaldateTime(starttime))
@@ -348,7 +355,7 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_ ,starttime = 0 ,endtime 
         
         if _ == 0 and starttime == 0:
             # --------------------------------------------------
-            x = load_data(symbol_, req.tf, limit_, startTime)
+            x = load_data(symbol_, req.tf, limit_, starttime,endtime)
             data_ALL.extend(x)  # Use extend to add elements of x to data_ALL
             
             if len(x) > 0 :
@@ -388,7 +395,7 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_ ,starttime = 0 ,endtime 
     
     # Create Task Get API Multi Task max_workers:20 
     with ThreadPoolExecutor(max_workers=20) as executor:
-        future_to_time = {executor.submit(load_data, symbol_, interval, limit_, time): time for time in loadTime}
+        future_to_time = {executor.submit(load_data, symbol_, interval, limit_, time,endtime): time for time in loadTime}
         for future in as_completed(future_to_time):
             time = future_to_time[future]
             try:
@@ -408,7 +415,7 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_ ,starttime = 0 ,endtime 
     #     print(CaldateTime(item[0]))
     #------------------------------------
     table_collection = req.symbol+'_'+req.tf 
-    insert(table_collection,resp)
+    #insert(table_collection,resp)
     return resp
     
   
