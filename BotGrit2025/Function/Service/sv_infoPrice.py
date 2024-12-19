@@ -109,6 +109,10 @@ def LoadPrice(req:req_getprice):
     query = None
     if query is None:
         query = {}
+    """
+    .sort("timestamp", 1) น้อย ไป มาก
+    .sort("timestamp", -1) มาก ไป น้อย
+    """
     resp = list(db[table_collection].find().sort("timestamp", 1))
     
     # ถ้า ไม่มี data ให้ Getdata
@@ -125,43 +129,66 @@ def LoadPrice(req:req_getprice):
         # Load Update Price
         
         endbar = len(resp)-1
-        data_start_time = resp[0]['timestamp']/1000
-        data_last_time = int(resp[endbar]['timestamp']/1000)
-        print('----------------------------------------------------------------')
+        data_last_time= resp[0]['timestamp']
+        data_start_time= resp[endbar]['timestamp']
         req_strptime_start = timeLoadAPI(req.datefrom)
-        req_strptime_end = timeLoadAPI(req.dateto)
+        req_strptime_end = 0 if req.dateto == "" else timeLoadAPI(req.dateto)
 
-        print('S>','DATA:',data_last_time,'GET req:',(req_strptime_start))
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(current_time)
         current_timestamp =timeLoadAPI(current_time)
-        print('--------current_time--------------------------------------------------------')
         calbar = 0
-        print(CaldateTime(current_timestamp/1000))
-        print(CaldateTime(req_strptime_end/1000))
+        # print(CaldateTime(current_timestamp/1000))
+       
+        
+        #print(CaldateTime(req_strptime_end/1000))
         #print(CaldateTime(req_strptime_last))
+        """
+         lengtbar_ = จำนวนแท่งทั้งหมดที่ Load TF 1m เท่านั้น
+         60000 = 60*1000 = 1m
+        """
         lengtbar_ = 0
-        if current_timestamp > req_strptime_end:
-           calbar = current_timestamp - req_strptime_end
-           if calbar > 60000:
-               lengtbar_ = calbar/60000
+        t = 7*60*60
+        print(CaldateTime(data_last_time/1000))
+        # Update Time
+        if current_timestamp > data_last_time:
+            calbar = current_timestamp - data_last_time
+            if calbar > 60000:
+               lengtbar_ = int(calbar/60000)
                lengtbar_s = calbar%60000
-               lengtbar_ss = int(calbar/60000)
+               lengtbar_ss = calbar/60000
                print(lengtbar_s,2%2,12%5,lengtbar_ss,lengtbar_)
                print('calbar:',lengtbar_)
-        print('----------------------------------------------------------------')
         
-        limit_ = 1000 if calbar >= 1000 else calbar
-        starttime = req_strptime_start
-        endtime = req_strptime_start
-        get_data(req,req.symbol,lengtbar_,limit_,starttime ,endtime)
+            limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_
+            """ 
+                ถ้า get time น้อยกว่า time ที่มีใน data ต้อง Load ใหม่มาเพิ่ม
+                starttime = timeต้องLoad <  timeที่มี 
+            """
+            starttime = data_last_time
+            endtime = req_strptime_end
+            """
+            - Load ช่วงเวลาล่าสุดก่อนเสมอ คือ Update Data Price
+            - เช็กเวลาที่ Get น้อยกว่า ก็ให้ Load เพิ่ม
+            """
+            get_data(req,req.symbol,lengtbar_,limit_,True,starttime ,endtime)
         
+        # Load add Time
+        if data_start_time < req_strptime_start:
+            calbar = req_strptime_start - data_start_time
+            if calbar > 60000:
+                lengtbar_ = int(calbar/60000)
+                
+            limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_    
+            starttime = req_strptime_start  
+            endtime = req_strptime_start
+            get_data(req,req.symbol,lengtbar_,limit_,False,starttime ,endtime)
+            
      
     return resp
-   ########################################################################################################
-   ########################################################################################################
-   ########################################################################################################
-   ########################################################################################################
+   ######################################################################################
+   ######################################################################################
+   ######################################################################################
+   ######################################################################################
 
 
 
@@ -328,20 +355,15 @@ def insert(table_collection, data):
 ########################################################################################################
 ########################################################################################################
 
-def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_ ,starttime = 0 ,endtime = 0):
+def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_,isUpdate ,starttime = 0 ,endtime = 0):
     """
         - ถ้า จำนวน lengtbar_ < 1000 จะไม่กระจาย Load จะ Load ทีเดียว  จะ Load โดยใช้ End Time
         - ถ้า จำนวน lengtbar_ > 1000  จะ คำนวนเวลา แล้วกระจาย Load 
         - รอบสุดท้ายที่กระจาย Load จะมีเศษ bar ไม่ถึง 1000 จะ Load โดยใช้ End Time
-    """
-    print('------------------------------------------------------------')
-    print('get_data : ',lengtbar_ ,limit_ ,starttime)
-    print('get_data CaldateTime: ',CaldateTime(starttime))
-    print('------------------------------------------------------------')
-    """
-    lengtbar_ = bar ราคาทั้งหมด ที่จะ Load 
-    limit_ = จำนวน bar ที่ Load แต่ละรอบ
-    num_batches = จำนวน รอบที่ Load
+   
+        lengtbar_ = bar ราคาทั้งหมด ที่จะ Load 
+        limit_ = จำนวน bar ที่ Load แต่ละรอบ
+        num_batches = จำนวน รอบที่ Load
     
     """ 
     num_batches = int(lengtbar_ / limit_)
@@ -377,15 +399,16 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_ ,starttime = 0 ,endtime 
             # --------------------------------------------------
         else:
             if starttime != 0 :
-                # 1723104392000
-                # 1723104387
-                # print(starttime,CaldateTime(starttime))
-                st = StartNewTime(interval, limit_)
-                if len(str(starttime)) < 13:
-                    starttime = starttime *1000
-                loadTime.append(starttime- st)
-                #print(loadTime[0],CaldateTime(loadTime[0]/1000))
-                starttime = 0
+                if isUpdate:
+                    loadTime.append(starttime)
+                    starttime = 0
+                else:
+                    st = StartNewTime(interval, limit_)
+                    if len(str(starttime)) < 13:
+                        starttime = starttime *1000
+                    loadTime.append(starttime- st)
+                    #print(loadTime[0],CaldateTime(loadTime[0]/1000))
+                    starttime = 0
             else:
                 st = StartNewTime(interval, limit_)
                 startTime = loadTime[len(loadTime)-1] - st
@@ -410,6 +433,14 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_ ,starttime = 0 ,endtime 
     #     print(CaldateTime(item[0]))
     print("SortData ...")
     resp = SortData(data_ALL)
+    startTime_load = resp[0][0]
+    EndTime_load = resp[len(resp)-1][0]
+    t = 7*60*60*1000
+    print("EndTime_load:",convert(EndTime_load+t))
+    print("startTime_load:",convert(startTime_load+t))
+    print("len Bar:",len(resp))
+    print("req.datefrom",(req.datefrom))
+    
     print("download Success...")
     # for item in resp:
     #     print(CaldateTime(item[0]))
