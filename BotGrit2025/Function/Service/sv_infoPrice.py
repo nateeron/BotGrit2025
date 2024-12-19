@@ -123,11 +123,11 @@ def LoadPrice(req:req_getprice):
         endtime = 0
         lengtbar_ = 3
         limit_ = 3
-        get_data(req,req.symbol,lengtbar_,limit_,starttime ,endtime)
+        get_data(req,req.symbol,lengtbar_,limit_,False,starttime ,endtime)
         resp = list(db[table_collection].find())
     else:
         # Load Update Price
-        
+        print('######################################################################################')
         endbar = len(resp)-1
         data_last_time= resp[0]['timestamp']
         data_start_time= resp[endbar]['timestamp']
@@ -138,7 +138,7 @@ def LoadPrice(req:req_getprice):
         current_timestamp =timeLoadAPI(current_time)
         calbar = 0
         # print(CaldateTime(current_timestamp/1000))
-       
+
         
         #print(CaldateTime(req_strptime_end/1000))
         #print(CaldateTime(req_strptime_last))
@@ -173,15 +173,15 @@ def LoadPrice(req:req_getprice):
             get_data(req,req.symbol,lengtbar_,limit_,True,starttime ,endtime)
         
         # Load add Time
-        if data_start_time < req_strptime_start:
-            calbar = req_strptime_start - data_start_time
-            if calbar > 60000:
-                lengtbar_ = int(calbar/60000)
-                
-            limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_    
-            starttime = req_strptime_start  
-            endtime = req_strptime_start
-            get_data(req,req.symbol,lengtbar_,limit_,False,starttime ,endtime)
+        #if data_start_time < req_strptime_start:
+        #    calbar = req_strptime_start - data_start_time
+        #    if calbar > 60000:
+        #        lengtbar_ = int(calbar/60000)
+        #    
+        #    limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_    
+        #    starttime = req_strptime_start  
+        #    endtime = req_strptime_start
+        #    get_data(req,req.symbol,lengtbar_,limit_,False,starttime ,endtime)
             
      
     return resp
@@ -413,9 +413,9 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_,isUpdate ,starttime = 0 
                 st = StartNewTime(interval, limit_)
                 startTime = loadTime[len(loadTime)-1] - st
                 loadTime.append(startTime)
-            
+
     # print(loadTime)
-    
+
     # Create Task Get API Multi Task max_workers:20 
     with ThreadPoolExecutor(max_workers=20) as executor:
         future_to_time = {executor.submit(load_data, symbol_, interval, limit_, time,endtime): time for time in loadTime}
@@ -433,11 +433,19 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_,isUpdate ,starttime = 0 
     #     print(CaldateTime(item[0]))
     print("SortData ...")
     resp = SortData(data_ALL)
-    startTime_load = resp[0][0]
-    EndTime_load = resp[len(resp)-1][0]
+    print("-----------------------")
     t = 7*60*60*1000
-    print("EndTime_load:",convert(EndTime_load+t))
-    print("startTime_load:",convert(startTime_load+t))
+    EndTime_load = resp[len(resp)-1][0]
+    if isUpdate:
+        startTime_load = req.datefrom
+        print("EndTime_load:",convert(EndTime_load+t))
+        print("startTime_load:",startTime_load)
+    else:
+        startTime_load = resp[0][0]
+        print("EndTime_load:",convert(EndTime_load+t))
+        print("startTime_load:",convert(startTime_load+t))
+    print("isUpdate:",isUpdate)
+   
     print("len Bar:",len(resp))
     print("req.datefrom",(req.datefrom))
     
