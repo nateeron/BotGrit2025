@@ -64,6 +64,10 @@
         //    currency: 'EUR', // Currency for data points
         //}).format;
         //----------------------------------------------------------
+
+        //**************************************************************************************
+        // [Chart Options]
+        //**************************************************************************************
         const chartOptions = {
             layout: {
                 textColor: '#E4E4E4',
@@ -79,11 +83,10 @@
                     const utcDate = new Date(time * 1000);
 
                     // Add 7 hours for Bangkok timezone (UTC+7)
-                    const bangkokTime = new Date(utcDate.getTime() + (7 * 60 * 60 * 1000));
+                    const bangkokTime = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
 
                     // Format Bangkok time as desired
-                    const formattedTime = utcDate.toLocaleString('en-US', {
-                        timeZone: 'Asia/Bangkok',
+                    const formattedTime = bangkokTime.toLocaleString('en-US', {
                         day: 'numeric',
                         month: 'short',
                         year: 'numeric',
@@ -113,32 +116,7 @@
                 priceFormatter: myPriceFormatter,
             },
         };
-
-        function formatPrice(value, decimals) {
-            return Number(value.toFixed(decimals));
-        }
-
-
-        function calculateMovingAverageSeriesData(candleData, maLength) {
-            const maData = [];
-
-            for (let i = 0; i < candleData.length; i++) {
-                if (i < maLength) {
-                    // Provide whitespace data points until the MA can be calculated
-                    maData.push({ time: candleData[i].time });
-                } else {
-                    // Calculate the moving average, slow but simple way
-                    let sum = 0;
-                    for (let j = 0; j < maLength; j++) {
-                        sum += candleData[i - j].close;
-                    }
-                    const maValue = sum / maLength;
-                    maData.push({ time: candleData[i].time, value: maValue });
-                }
-            }
-
-            return maData;
-        }
+        
 
         const container = document.getElementById('chart1');
         const chart = LightweightCharts.createChart(container, chartOptions);
@@ -150,7 +128,9 @@
             wickUpColor: '#26a69a',
             wickDownColor: '#ef5350',
         });
-
+        //*************************************************************************************
+        // [ MA ]
+        //*************************************************************************************
         let socket;
         let maSeries;
         let maSeries2;
@@ -178,6 +158,38 @@
         //*************************************************************************************
         // Function
         //*************************************************************************************
+        
+        function formatPrice(value, decimals) {
+            return Number(value.toFixed(decimals));
+        }
+        function CheckTimelineData(data){
+            console.log(data);
+            let t1 = data[0].timestamp;
+            let t2 = data[1].timestamp;
+            if(t1 < t2) return true;
+            return false;
+        }
+
+        function calculateMovingAverageSeriesData(candleData, maLength) {
+            const maData = [];
+
+            for (let i = 0; i < candleData.length; i++) {
+                if (i < maLength) {
+                    // Provide whitespace data points until the MA can be calculated
+                    maData.push({ time: candleData[i].time });
+                } else {
+                    // Calculate the moving average, slow but simple way
+                    let sum = 0;
+                    for (let j = 0; j < maLength; j++) {
+                        sum += candleData[i - j].close;
+                    }
+                    const maValue = sum / maLength;
+                    maData.push({ time: candleData[i].time, value: maValue });
+                }
+            }
+
+            return maData;
+        }
         function StartNewTime(interval, factor) {
             // Define the number of seconds per interval unit
             const intervalUnits = {
@@ -206,18 +218,22 @@
         function removeDuplicates(data) {
             const seen = new Set();
             //const resp = data.filter(item => {
-            //   console.log(item.timestem);
+            //   console.log(item.timestamp);
             //});
             const resp = data.filter(item => {
-                const duplicate = seen.has(item.timestem);
-                seen.add(item.timestem);
+                const duplicate = seen.has(item.timestamp);
+                seen.add(item.timestamp);
                 return !duplicate;
             });
             return resp
         }
         function SortData(data) {
+            console.log(data)
             // Sort the filtered data by time in ascending order
-            const sortedData = data.sort((a, b) => a[0] - b[0]);
+          const sortedData = data.sort((a, b) =>   a.timestamp -b.timestamp);
+            //const sortedData = data.sort((a, b) => {
+            //    console.log(a.timestamp);
+            //});
             return sortedData;
         }
         //*************************************************************************************
@@ -231,7 +247,9 @@
                 "dateto":"10-03-2025",
                 "ohcl":"c"
             }*/
-
+        //*************************************************************************************
+        // Call API [Post] 'http://127.0.0.1:45441/infoPrice/getprice'
+        //*************************************************************************************
         async function fetchData() {
             // Create the data to send in the POST request
             const urldata = 'http://127.0.0.1:45441/infoPrice/getprice'
@@ -255,8 +273,33 @@
 
             // Parse the response as JSON
             const data = await response.json();
+            const isPass = CheckTimelineData(data)
+            if (!isPass) {
+                console.error("sort Timeline Data 0,1,2,3 ต้องจากน้อยไปมาก");
+            }
+            console.log(urldata,requestData)
+            console.log(data)
             return data;
         }
+        async function fetchAllKlines(symbol, interval) {
+            let allData = [];
+
+            try {
+                const data = await fetchData();
+                allData = allData.concat(data);
+                const resp = SortData(allData)
+                const validData = validateData(resp);
+                const noDuplicatesData = removeDuplicates(validData);
+
+                return noDuplicatesData;
+            } catch {
+                return null
+
+            }
+        }
+        //*************************************************************************************
+        // [function 2]
+        //*************************************************************************************
         function calbar_From_Time(start_time) {
             const offsetUTC7 = 7 * 60 * 60 * 1000;
             const startTime = new Date().getTime() + offsetUTC7;
@@ -326,78 +369,39 @@
 
             return formattedData;
         }
-        const limit = 300;
-        const totalRows = 300;
-        async function fetchAllKlines(symbol, interval, totalRows) {
-            let allData = [];
-            let fetchCount = Math.ceil(totalRows / limit);
-            // console.log("fetchCount", totalRows, limit)
-            // console.log(fetchCount)
-            const promises = [];
-            let lastEndTime = null;
-
-            try {
-                //for (let i = 0; i < fetchCount; i++) {
-                //   
-                //    //console.log(allData)
-                //    console.log(allData.length)
-                //    
-                //    //for (let i = 0; i < allData.length; i++) {
-                //    //    console.log(allData[i][0], convert_TS(allData[i][0]))
-                //    //}
-                //    if (data.length > 0) {
-                //        const st = StartNewTime(interval, limit)
-                //        
-                //        lastEndTime = (data[0].timestem /1000) - st; // Use the endTime of the last kline
-                //        console.log("lastEndTime: ",lastEndTime)
-                //    }
-                //}
-                const data = await fetchData();
-                allData = allData.concat(data);
-                const resp = SortData(allData)
-                // เช็ก Data
-                //    console.log(resp)
-                //    for(let i = 0; i < resp.length; i++){
-                //    console.log(resp[i][0],convert_TS(allData[i][0]))
-                //
-                //}
-                const validData = validateData(resp);
-                const noDuplicatesData = removeDuplicates(validData);
-
-                return noDuplicatesData;
-            } catch {
-                return null
-
-            }
-        }
+        
+        
+        //*************************************************************************************
+        // [Start ]
         //*************************************************************************************
         let processedData = null
         // อ้างอิง : https://developers.binance.com/docs/binance-spot-api-docs/rest-api
         async function fetchHistoricalData(symbol, interval, limit) {
-            //const base_url = "https://api.binance.com/api/v3/klines";
 
-            const rawKlines = await fetchAllKlines(symbol, interval, totalRows);
-            //const params = new URLSearchParams({
-            //    symbol: symbol,
-            //    interval: interval,
-            //    limit: limit
-            //});
+            const rawKlines =await fetchAllKlines(symbol, interval);
+        
             try {
-                //processedData = rawKlines.map(item => {
-                //        console.log(item)
-                //});
+               const UTCBangkok = 7*60*60
                 processedData = rawKlines.map(item => ({
-                    time: Math.floor(item.timestem / 1000), // Convert milliseconds to seconds
+                    time: Math.floor(item.timestamp / 1000+UTCBangkok), // Convert milliseconds to seconds
                     open: parseFloat(item.open),
                     high: parseFloat(item.high),
                     low: parseFloat(item.low),
                     close: parseFloat(item.close)
                 }));
                 //********************************* Load Reailtime *********************************
+                console.log(rawKlines)
                 console.log(rawKlines.length)
+                console.log(processedData)
+                //close: 2.5194
+                //high: 2.5219
+                //low: 2.5188
+                //open: 2.5214
+                //time: 1734542280
+                
                 //const offsetUTC7 = 7 * 60 * 60 * 1000;
-                //console.log('Load Reailtime:', rawKlines[0].timestem - offsetUTC7)
-                //const timestamp = rawKlines[rawKlines.length - 1].timestem;
+                //console.log('Load Reailtime:', rawKlines[0].timestamp - offsetUTC7)
+                //const timestamp = rawKlines[rawKlines.length - 1].timestamp;
                 //const FromOutService = fetchData_LastReailTime(symbol, interval, timestamp)
 
                 //// Create a Date object from the timestamp
@@ -451,6 +455,9 @@
                     },
 
                 ];
+                console.log(`wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_${interval}`)
+                console.log(markers)
+                console.log(symbol, interval)
                 candlestickSeries.setMarkers(markers);
                 runRealtimeUpdates(symbol, interval);
                 //})
@@ -465,22 +472,25 @@
             if (socket) {
                 socket.close();
             }
-            // Get Price Reailtime
+                
+                // Get Price Reailtime
             socket = new WebSocket(`wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_${interval}`);
 
             socket.onmessage = function (event) {
                 const message = JSON.parse(event.data);
-                
+                const utcBangkok = 7*60*60
                 const candle = {
-                    time: message.k.t / 1000,  // Convert milliseconds to seconds
+                    time: message.k.t / 1000 +utcBangkok,  // Convert milliseconds to seconds
                     open: parseFloat(message.k.o),
                     high: parseFloat(message.k.h),
                     low: parseFloat(message.k.l),
                     close: parseFloat(message.k.c),
                 };
 
-
+                console.log(message)
                 candlestickSeries.update(candle);
+                console.log(candle)
+                console.log(candlestickSeries)
                 //------ Start EMA20 -----------------
                 // EMA 20
                 const data = candlestickSeries.data();
@@ -609,31 +619,39 @@
                 tooltip.style.display = 'none'; // Hide tooltip if no time data
                 return;
             }
-
+        
+            // Convert to milliseconds and adjust for Bangkok timezone (UTC+7)
             const timestamp = param.time * 1000; // Convert to milliseconds
             const bangkokTime = new Intl.DateTimeFormat('en-US', {
-                timeZone: 'Asia/Bangkok',
                 hour: '2-digit',
                 minute: '2-digit',
                 hour12: false,
-            }).format(new Date(timestamp));
-
-            // Set custom tooltip text and position
-            tooltip.textContent = `Bar Time: ${bangkokTime}`;
-            console.log(bangkokTime)
-            // Position tooltip near the mouse pointer
-            tooltip.style.display = 'block';
-            tooltip.style.left = `${param.point.x + 10}px`;
-            tooltip.style.top = `${param.point.y + 10}px`;
-            tooltip.style.zIndex = '1';
-            // Optional: Set text color based on a condition, e.g., based on the bar's closing price
+            }).format(new Date(timestamp - (7 * 60 * 60 * 1000))); // Adjust for UTC+7
+        
+            // Find the bar corresponding to the current time
             const bar = processedData.find(item => item.time === param.time);
+        
             if (bar) {
+                const closePrice = bar.close; //close Get the close price
+                const openPrice = bar.open; //close Get the close price
+        
+                // Set custom tooltip text with bar time and close price
+                tooltip.textContent = `Bar Time: ${bangkokTime} | Close: ${closePrice} Open:${openPrice}`;
+        
+                // Optional: Set background color based on bullish or bearish bar
                 if (bar.close > bar.open) {
-                    tooltip.style.backgroundColor = 'green'; // Bullish bar
+                    tooltip.style.backgroundColor = '#4ab9a4'; // Bullish bar
                 } else {
-                    tooltip.style.backgroundColor = 'red'; // Bearish bar
+                    tooltip.style.backgroundColor = '#C04444FF'; // Bearish bar
                 }
+        
+                // Position tooltip near the mouse pointer
+                tooltip.style.display = 'block';
+                tooltip.style.left = `${param.point.x + 10}px`;
+                tooltip.style.top = `${param.point.y + 10}px`;
+                tooltip.style.zIndex = '1';
+            } else {
+                tooltip.style.display = 'none'; // Hide tooltip if no matching bar
             }
         });
         const styles = `

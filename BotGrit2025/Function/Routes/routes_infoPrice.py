@@ -1,6 +1,11 @@
 from fastapi import APIRouter,HTTPException
 from Function.Models.model_routes_infoPrice import req_getprice
-from Function.Service.sv_infoPrice import LoadPrice,load_date,getprice_Api,load_data,dateTime_To_timestamp
+from Function.Service.sv_infoPrice import (LoadPrice,load_date,
+                                           getprice_Api,
+                                           load_data,
+                                           dateTime_To_timestamp,
+                                           timeLoadAPI)
+
 import json
 from datetime import datetime,timedelta
 from fastapi.encoders import jsonable_encoder
@@ -54,15 +59,24 @@ def get_ValibleDateData():
     return resp
 
 
-@r_infoPrice.get("/infoPrice/getprice")
-def get_price():
-    print(" get_price")
-    symbol = 'XRPUSDT'
-    interval = '1m'
-    limit ='2'
+@r_infoPrice.post("/infoPrice/loadPrice")
+def get_price(req: req_getprice):
+    """ 
+            "symbol":"XRPUSDT",
+            "tf":"1m",
+            "getAll": false,
+            "datefrom":"18-12-2024",
+            "dateto":"18-12-2025",
+            "ohlc":"ohlc"
+    """
+    print("get_price")
+    symbol = req.symbol
+    interval = req.tf
+    limit =0
     
-    current_time = dateTime_To_timestamp(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) - 1*60*60
-    resp = load_data(symbol, interval, limit, current_time)
+    datefrom = timeLoadAPI(req.datefrom)
+    EndTime= timeLoadAPI(req.dateto)
+    resp = load_data(symbol, interval, limit, datefrom,EndTime)
     
     print(resp)
     #resp_converted = convert_objectid(resp)
