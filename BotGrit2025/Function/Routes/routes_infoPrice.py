@@ -1,9 +1,9 @@
 from fastapi import APIRouter,HTTPException
-from Function.Models.model_routes_infoPrice import req_getprice
+from Function.Models.model_routes_infoPrice import req_getprice,DeleteRequest
 from Function.Service.sv_infoPrice import (LoadPrice,load_date,
-                                           getprice_Api,
                                            load_data,
                                            dateTime_To_timestamp,
+                                           deleteData,
                                            timeLoadAPI)
 
 import json
@@ -44,7 +44,6 @@ def getprice(req: req_getprice):
         print(type(resp))
         resp_converted = convert_objectid(resp)
         resps = JSONResponse(content=resp_converted)
-        print(resps)
         
         return resps
 @r_infoPrice.get("/infoPrice/date")
@@ -52,7 +51,6 @@ def get_ValibleDateData():
     print(" sss")
     resp = load_date('XRPUSDT_1m')
     
-    print(resp)
     ## resp_converted = convert_objectid(resp)
     ## #
     ## resps = JSONResponse(content=resp_converted)
@@ -78,8 +76,13 @@ def get_price(req: req_getprice):
     EndTime= timeLoadAPI(req.dateto)
     resp = load_data(symbol, interval, limit, datefrom,EndTime)
     
-    print(resp)
     #resp_converted = convert_objectid(resp)
     ## #
     #resps = JSONResponse(content=resp_converted)
+    return resp
+
+
+@r_infoPrice.post("/infoPrice/delete")
+def delete_Data(req : DeleteRequest):
+    resp = deleteData(req.tableName)
     return resp

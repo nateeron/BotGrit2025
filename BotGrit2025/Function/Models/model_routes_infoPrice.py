@@ -17,4 +17,10 @@ class resp_price(BaseModel):
     low: float
     close: float
     volume:int 
+class IsUpdate:
+    Empty = 1
+    Update = 2
+    Load = 3
     
+class DeleteRequest(BaseModel):
+    tableName: str

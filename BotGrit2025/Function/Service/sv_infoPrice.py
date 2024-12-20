@@ -1,6 +1,6 @@
 
 from Function.MongoDatabase import db
-from Function.Models.model_routes_infoPrice import req_getprice
+from Function.Models.model_routes_infoPrice import req_getprice,IsUpdate,DeleteRequest
 import asyncio
 import requests
 
@@ -8,12 +8,18 @@ from datetime import datetime,timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-
-
+## TS: int10 to datetime
+## TS: int13 to datetime
+## TS: int10 to datetime bangkok
+## TS: int13 to datetime bangkok
+## TS: datetime to int10
+## TS: datetime to int13
+## TS: datetime to int10 bangkok
+## TS: datetime to int13 bangkok
 base_url = "https://api.binance.com/api/v3/klines"
 interval = '1m' 
 
-def convert(timestamp:int):
+def convert_timestamp(timestamp:int):
     """convert
 
     Args:
@@ -52,19 +58,18 @@ def load_date(table):
     for s in resp:
         # Add formatted timestamp to the document
         #s['dateT'] = convert(s.get('timestamp'))
-        ss= convert(s.get('timestamp'))
+        df= (s.get('timestamp'))
+        ss= convert_timestamp(s.get('timestamp'))
+        bk= convert_timestamp(s.get('timestamp')+(7*60*60*1000))
         cs= (s.get('Create_Date'))
-        result.append(str(ss)+'|'+str(cs))
+        result.append(str(df)+','+str(ss)+','+str(bk)+'|'+str(cs))
     return result
 
 
 def timeLoadAPI(datefrom):
     """datefrom = "2024-12-19 13:57:00" convert to int 1734591420000 (- 7 Bangkok) """
     return  dateTime_To_timestamp(datefrom) *1000- (7*60*60 *1000)
-def getprice_Api():
-    
-    
-    pass
+
 
 
 
@@ -113,25 +118,28 @@ def LoadPrice(req:req_getprice):
     .sort("timestamp", 1) น้อย ไป มาก
     .sort("timestamp", -1) มาก ไป น้อย
     """
-    resp = list(db[table_collection].find().sort("timestamp", 1))
+    resp = list(db[table_collection].find().sort("timestamp", -1))
     
     # ถ้า ไม่มี data ให้ Getdata
     if resp == []:
     #if True:
-    
+        # Non data
         starttime = 0
         endtime = 0
         lengtbar_ = 3
         limit_ = 3
-        get_data(req,req.symbol,lengtbar_,limit_,False,starttime ,endtime)
+        get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Empty,starttime ,endtime)
         resp = list(db[table_collection].find())
     else:
-        # Load Update Price
+        
+        # 1. Load Update Price หน้า 
+        #   - (ใช้ เวลา Now) - (ราคาจาก Data เวลาล่าสุด)  
+        # 2. Load Update Price หลัง
+        #   - (ใช้เวลา เก่าสุดใน Data) - (เวลาที่ส่ง Post มา (req.datefrom))
         print('######################################################################################')
         endbar = len(resp)-1
         data_last_time= resp[0]['timestamp']
         data_start_time= resp[endbar]['timestamp']
-        req_strptime_start = timeLoadAPI(req.datefrom)
         req_strptime_end = 0 if req.dateto == "" else timeLoadAPI(req.dateto)
 
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -148,15 +156,11 @@ def LoadPrice(req:req_getprice):
         """
         lengtbar_ = 0
         t = 7*60*60
-        print(CaldateTime(data_last_time/1000))
         # Update Time
         if current_timestamp > data_last_time:
             calbar = current_timestamp - data_last_time
             if calbar > 60000:
                lengtbar_ = int(calbar/60000)
-               lengtbar_s = calbar%60000
-               lengtbar_ss = calbar/60000
-               print(lengtbar_s,2%2,12%5,lengtbar_ss,lengtbar_)
                print('calbar:',lengtbar_)
         
             limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_
@@ -164,26 +168,29 @@ def LoadPrice(req:req_getprice):
                 ถ้า get time น้อยกว่า time ที่มีใน data ต้อง Load ใหม่มาเพิ่ม
                 starttime = timeต้องLoad <  timeที่มี 
             """
-            starttime = data_last_time
+            starttime = data_last_time + (60*1000)
             endtime = req_strptime_end
             """
             - Load ช่วงเวลาล่าสุดก่อนเสมอ คือ Update Data Price
             - เช็กเวลาที่ Get น้อยกว่า ก็ให้ Load เพิ่ม
             """
-            get_data(req,req.symbol,lengtbar_,limit_,True,starttime ,endtime)
-        
-        # Load add Time
-        #if data_start_time < req_strptime_start:
-        #    calbar = req_strptime_start - data_start_time
-        #    if calbar > 60000:
-        #        lengtbar_ = int(calbar/60000)
-        #    
-        #    limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_    
-        #    starttime = req_strptime_start  
-        #    endtime = req_strptime_start
-        #    get_data(req,req.symbol,lengtbar_,limit_,False,starttime ,endtime)
+            get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Update,starttime ,endtime)
             
-     
+        # Load add Time
+        if req.datefrom != "":
+            req_strptime_start = timeLoadAPI(req.datefrom)
+
+            if req_strptime_start < data_start_time  :
+                calbar = data_start_time -req_strptime_start
+                if calbar >= 60000:
+                    lengtbar_ = int(calbar/60000)
+
+                limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_    
+                starttime = req_strptime_start  
+                endtime = req_strptime_start
+                #get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Load,starttime ,endtime)
+            
+    resp = list(db[table_collection].find().sort("timestamp", -1))
     return resp
    ######################################################################################
    ######################################################################################
@@ -208,12 +215,10 @@ def load_data_SETTime(symbol, interval, limit, lastEndTime):
     # [lastEndTime]----------------------------------------------------------------
     if lastEndTime != 0 and 1==1:
         # เวลา ที่ดึงมาจะ -7 bangkok
-        print('ts:',lastEndTime)
         if len(str(lastEndTime)) < 13:
             lastEndTime = ((lastEndTime) * 1000 - utc )
         else:
             lastEndTime = ((lastEndTime) - utc )
-        print('ts convert:',lastEndTime)
 
         params['startTime'] = lastEndTime
     # [EndTime] ----------------------------------------------------------------
@@ -366,12 +371,15 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_,isUpdate ,starttime = 0 
         num_batches = จำนวน รอบที่ Load
     
     """ 
-    num_batches = int(lengtbar_ / limit_)
+    num_batches =0
+    if lengtbar_ != 0:
+        num_batches = int(lengtbar_ / limit_)
     data_ALL = []
     print("download.....")
     loadTime= []
     if lengtbar_ >0 and num_batches == 0:
         num_batches = 1
+    
     # หาค่า เวลา แล้วกระจาย Load
     for _ in range(num_batches):
         
@@ -380,26 +388,26 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_,isUpdate ,starttime = 0 
             x = load_data(symbol_, req.tf, limit_, starttime,endtime)
             data_ALL.extend(x)  # Use extend to add elements of x to data_ALL
             
-            if len(x) > 0 :
-                """
-                limit_ = 3
-                interval = (18)
-                example [0],1,2,[3],4,5,[6],7,8,[9],10,11,[12],13,14,[15],16,17,(18 start),(on data 19,20,21,22,23,24,25)
-                loadTime = [15,12,9,6,3,0]
-                resp =  [15,16,17],
-                        [12,13,14],
-                        [9 ,10,11],
-                        [6 ,7 ,8 ],
-                        [3 ,4 ,5 ],
-                        [0 ,1 ,2 ]
-                """
-                st = StartNewTime(interval, limit_)
-                startTime = x[0][0] - st
-                loadTime.append(startTime)
+            #if len(x) > 0 :
+                #st = StartNewTime(interval, limit_)
+                #startTime = x[0][0] - st
+                #loadTime.append(startTime)
             # --------------------------------------------------
         else:
+            """
+            limit_ = 3
+            interval = (18)
+            example [0],1,2,[3],4,5,[6],7,8,[9],10,11,[12],13,14,[15],16,17,(18 start),(on data 19,20,21,22,23,24,25)
+            loadTime = [15,12,9,6,3,0]
+            resp =  [15,16,17],
+                    [12,13,14],
+                    [9 ,10,11],
+                    [6 ,7 ,8 ],
+                    [3 ,4 ,5 ],
+                    [0 ,1 ,2 ]
+            """
             if starttime != 0 :
-                if isUpdate:
+                if isUpdate == 2:
                     loadTime.append(starttime)
                     starttime = 0
                 else:
@@ -417,6 +425,7 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_,isUpdate ,starttime = 0 
     # print(loadTime)
 
     # Create Task Get API Multi Task max_workers:20 
+    
     with ThreadPoolExecutor(max_workers=20) as executor:
         future_to_time = {executor.submit(load_data, symbol_, interval, limit_, time,endtime): time for time in loadTime}
         for future in as_completed(future_to_time):
@@ -424,37 +433,33 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_,isUpdate ,starttime = 0 
             try:
                 data = future.result()
                 data_ALL.extend(data)
-               
             except Exception as e:
                 print(f"Request failed for time {time}: {e}")
+    
     #print(CaldateTime(time))
     
     # for item in data_ALL:
     #     print(CaldateTime(item[0]))
-    print("SortData ...")
     resp = SortData(data_ALL)
-    print("-----------------------")
-    t = 7*60*60*1000
-    EndTime_load = resp[len(resp)-1][0]
-    if isUpdate:
-        startTime_load = req.datefrom
-        print("EndTime_load:",convert(EndTime_load+t))
-        print("startTime_load:",startTime_load)
-    else:
-        startTime_load = resp[0][0]
-        print("EndTime_load:",convert(EndTime_load+t))
-        print("startTime_load:",convert(startTime_load+t))
-    print("isUpdate:",isUpdate)
-   
-    print("len Bar:",len(resp))
-    print("req.datefrom",(req.datefrom))
-    
-    print("download Success...")
-    # for item in resp:
-    #     print(CaldateTime(item[0]))
-    #------------------------------------
     table_collection = req.symbol+'_'+req.tf 
-    #insert(table_collection,resp)
+    t = 7*60*60*1000
+    print("download Success...")
+    print("----------------------------------------------------")
+    for item in resp:
+        print(convert_timestamp(item[0]+t))
+    print("----------------------------------------------------")
+    if isUpdate != 3:
+        if len(resp) > 0:
+            insert(table_collection,resp)
     return resp
     
-  
+def deleteData(tableName : str):
+    try:
+        # Check if the collection exists
+        if tableName in db.list_collection_names():
+            db[tableName].drop()  # Drop the collection
+            return {"status": 200, "message": f"Collection '{tableName}' deleted successfully."}
+        else:
+            return {"status": 404, "message": f"Collection '{tableName}' not found."}
+    except Exception as e:
+        return {"status": 500, "message": f"Error occurred: {str(e)}"}
