@@ -186,9 +186,9 @@ def LoadPrice(req:req_getprice):
                     lengtbar_ = int(calbar/60000)
 
                 limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_    
-                starttime = req_strptime_start  
-                endtime = req_strptime_start
-                #get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Load,starttime ,endtime)
+                starttime = data_start_time  
+                endtime = data_start_time
+                get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Load,starttime ,endtime)
             
     resp = list(db[table_collection].find().sort("timestamp", -1))
     return resp
@@ -443,12 +443,13 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_,isUpdate ,starttime = 0 
     resp = SortData(data_ALL)
     table_collection = req.symbol+'_'+req.tf 
     t = 7*60*60*1000
+    print("Number Data:",len(resp))
     print("download Success...")
     print("----------------------------------------------------")
-    for item in resp:
-        print(convert_timestamp(item[0]+t))
+    #for item in resp:
+    #    print(convert_timestamp(item[0]+t))
     print("----------------------------------------------------")
-    if isUpdate != 3:
+    if isUpdate != 4:
         if len(resp) > 0:
             insert(table_collection,resp)
     return resp
