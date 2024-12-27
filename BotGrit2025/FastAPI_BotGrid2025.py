@@ -1,41 +1,61 @@
 from fastapi import FastAPI
-from Function.Routes.routes import price_router
-from Function.Routes.routes_ConfigBot import r_ConfigBot
-from Function.Routes.routes_infoPrice import r_infoPrice
 from fastapi.middleware.cors import CORSMiddleware
-
-import uvicorn
-
-
-
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+import asyncio
+from typing import AsyncGenerator
+import time
+# Initialize the FastAPI app
 app = FastAPI()
+
+# Add CORS middleware to allow cross-origin requests
 origins = [
-    "http://127.0.0.1:5500",  # Allow requests from this origin (you can add more as needed)
-    "http://localhost:5500",   # Another example for localhost
+    "http://127.0.0.1:5500",  # Your frontend server's address
+    "http://localhost:5500",
+    "http://127.0.0.1:5501/*"
 ]
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Allow only specific origins
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],    # Allow all HTTP methods
-    allow_headers=["*"],    # Allow all headers
+    allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
 )
 
-# Include the router for price-related endpoints
-app.include_router(price_router)
-app.include_router(r_ConfigBot)
-app.include_router(r_infoPrice)
+# Create a shared queue for SSE messages
+message_queue = asyncio.Queue()
 
 
-@app.on_event("startup")
-async def startup_event():
-    print("FastAPI app started")
+class PriceData(BaseModel):
+    price: float
 
+
+@app.post("/update_price/")
+async def update_price(price_data: PriceData):
+    """
+    Endpoint to update price and notify clients in real-time.
+    """
+    message = f"Price updated to {price_data.price}"
+    await message_queue.put(message)
+    print(f"Received price update: {price_data}")
+    return {"status": "success", "message": "Price updated successfully", "data": price_data.price}
+
+        
+@app.get("/events")
+async def get_events() -> StreamingResponse:
+    """
+    SSE endpoint to stream real-time messages to clients.
+    """
+    async def event_stream() -> AsyncGenerator[str, None]:
+        while True:
+            message = await message_queue.get()  # Wait for new message
+            yield f"data: {message}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# Run the Uvicorn server
 if __name__ == "__main__":
-    #uvicorn.run("FastAPI_BotGrid2025:app", host="127.0.0.1", port=45441, reload=True)
-    uvicorn.run("FastAPI_BotGrid2025:app", host="127.0.0.1", port=45441, reload=True)
-
-# uvicorn FastAPI_BotGrid2025:app --reload
-# uvicorn FastAPI_BotGrid2025:app --reload --port 45441
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=45441, reload=True)
