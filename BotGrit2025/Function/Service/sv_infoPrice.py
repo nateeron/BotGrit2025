@@ -35,7 +35,7 @@ def convert_timestamp(timestamp:int):
     # Format datetime as string
     return date_time.strftime("%Y-%m-%d %H:%M:%S")
 
-def load_date(table):
+def load_dates(table):
     """_summary_
 
     Args:
@@ -65,17 +65,176 @@ def load_date(table):
         result.append(str(df)+','+str(ss)+','+str(bk)+'|'+str(cs))
     return result
 
+def load_date(table):
+    """_summary_
+
+    Args:
+        table (str): 'XRPUSDT_1m'
+
+    Returns:
+        List<str>: [
+                    "2024-12-17 20:20:00|2024-12-19 13:32:52",
+                    "2024-12-17 20:21:00|2024-12-19 13:32:52",
+                    "2024-12-17 20:22:00|2024-12-19 13:32:52",
+                    "2024-12-17 20:23:00|2024-12-19 13:32:52",
+                    ]
+    """
+    # Retrieve documents from MongoDB collection
+    resp = list(db[table].find({}, {"timestamp": 1,"Create_Date":1, "close": 1}).sort("timestamp", -1))
+    # Map over the response and convert timestamp
+    result = []
+    result_oj = []
+    result_ojson ={}
+    count = 0 
+    loop =1
+    print(len(resp))
+    # Loop through the response and convert timestamp
+    for index, s in enumerate(resp):
+        count += 1
+        
+        # Add formatted timestamp to the document
+        #s['dateT'] = convert(s.get('timestamp'))
+        df= (s.get('timestamp'))
+        ss= convert_timestamp(s.get('timestamp'))
+        bk= convert_timestamp(s.get('timestamp')+(7*60*60*1000))
+        cs= (s.get('Create_Date'))
+        #result_oj.append(str(index)+" "+str(df)+','+str(ss)+','+str(bk)+'|'+str(cs))
+        #result_oj.append(index)
+        
+        result_ojson[str(df)+"_"+str(index+1)+"_"+str(count)] = (str(bk)+' ,'+str(ss)+'|'+str(cs))
+        #result_oj[str(df)+"_"+str(index)] = (str(ss)+','+str(bk)+'|'+str(cs))
+        if index == 0:
+                info = {
+                    "Data Langth": len(resp),
+                    "Data Oject number ": f"{(len(resp)/1000):.2f}" ,
+                }
+                result.append(info)
+        if count == 1000 :
+            
+            result.append(result_ojson)
+            result_oj = []   # Reset the chunk
+            result_ojson ={}  # Reset the chunk
+            count = 0
+        if len(resp) ==  loop:
+            print(len(resp),loop)
+            result.append(result_ojson)
+          
+        loop+=1
+    return result
 
 def timeLoadAPI(datefrom):
     """datefrom = "2024-12-19 13:57:00" convert to int 1734591420000 (- 7 Bangkok) """
     return  dateTime_To_timestamp(datefrom) *1000- (7*60*60 *1000)
 
 
-
+def timeLoad_data(datefrom):
+    """datefrom = "2024-12-19 13:57:00" convert to int 1734591420000 (- 7 Bangkok) """
+    return  dateTime_To_timestamp(datefrom) *1000
 
 
 ########################################################################################################
 ########################################################################################################
+def LoadPrice_Start(req:req_getprice):
+    
+    """
+    https://api.binance.com/api/v3/klines?symbol=XRPUSDT&interval=1m&limit=1
+        Response Example
+        [
+            [0]1591258320000,      	// Open time\n
+            [1]"9640.7",       	 	// Open\n
+            [2]"9642.4",       	 	// High\n
+            [3]"9640.6",       	 	// Low\n
+            [4]"9642.0",      	 	 	// Close (or latest price)\n
+            [5]"206", 			 		// Volume\n
+            [6]1591258379999,       	// Close time\n
+            [7]"2.13660389",    		// Base asset volume\n
+            [8]48,             		// Number of trades\n
+            [9]"119",    				// Taker buy volume\n
+            [10]"1.23424865",      		// Taker buy base asset volume\n
+            [11]"0" 					// Ignore.\n
+        ]
+    """
+    table_collection = req.symbol+'_'+req.tf 
+    query = None
+    if query is None:
+        query = {}
+    
+    timestamp_min = timeLoadAPI(req.datefrom) if req.datefrom != "" else 0
+  
+    resp = list(db[table_collection].find().sort("timestamp", -1))
+    langthData = len(resp)
+    print(langthData)
+    #isdata = len(list(db[table_collection].find()))
+    isdata = langthData 
+    
+    # ถ้า ไม่มี data ให้ Getdata
+    if isdata == 0 :
+    #if True:
+        # Non data
+        starttime = 0
+        endtime = 0
+        lengtbar_ = 1000
+        limit_ = 1000
+        get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Empty,starttime ,endtime)
+        resp = list(db[table_collection].find())
+    else:
+        
+        # 1. Load Update Price หน้า 
+        #   - (ใช้ เวลา Now) - (ราคาจาก Data เวลาล่าสุด)  
+        # 2. Load Update Price หลัง
+        #   - (ใช้เวลา เก่าสุดใน Data) - (เวลาที่ส่ง Post มา (req.datefrom))
+        print('######################################################################################')
+        endbar = len(resp)-1
+        data_last_time= resp[0]['timestamp'] if len(resp) != 0 else timestamp_min
+        data_start_time= resp[endbar]['timestamp'] if len(resp) != 0 else 0
+
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_timestamp =timeLoadAPI(current_time)
+        calbar = 0
+        
+        """
+         lengtbar_ = จำนวนแท่งทั้งหมดที่ Load TF 1m เท่านั้น
+         60000 = 60*1000 = 1m
+        """
+        lengtbar_ = 0
+        # Update Time
+        if current_timestamp > data_last_time:
+            calbar = current_timestamp - data_last_time
+            if calbar > 60000:
+               lengtbar_ = int(calbar/60000)
+               print('calbar:',lengtbar_)
+        
+            limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_
+            """ 
+                ถ้า get time น้อยกว่า time ที่มีใน data ต้อง Load ใหม่มาเพิ่ม
+                starttime = timeต้องLoad <  timeที่มี 
+            """
+            starttime = data_last_time + (60*1000)
+            endtime = 0
+            """
+            - Load ช่วงเวลาล่าสุดก่อนเสมอ คือ Update Data Price
+            - เช็กเวลาที่ Get น้อยกว่า ก็ให้ Load เพิ่ม
+            """
+            get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Update,starttime ,endtime)
+            
+        # Load add Time
+        if req.datefrom != "":
+            req_strptime_start = timestamp_min
+
+            if req_strptime_start < data_start_time  :
+                calbar = data_start_time -req_strptime_start
+                if calbar >= 60000:
+                    lengtbar_ = int(calbar/60000)
+
+                limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_    
+                starttime = data_start_time  
+                endtime = data_start_time
+                get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Load,starttime ,endtime)
+                
+    resp = list(db[table_collection].find().sort("timestamp", -1).limit(1000))            
+  
+    return resp
+
 def LoadPrice(req:req_getprice):
     
     """
@@ -117,17 +276,50 @@ def LoadPrice(req:req_getprice):
     """
     .sort("timestamp", 1) น้อย ไป มาก
     .sort("timestamp", -1) มาก ไป น้อย
+    Explanation of Operators:
+    
+        $gt:  A > B
+        $lt:  A < B
+        $gte: A >= B
+        $lte: A <= B
+        
+        $gt: ตรงกับค่าที่มากกว่าค่าที่ระบุ A > B
+            Example: {"timestamp": {"$gt": 1734708600000}} (timestamp > 1734708600000).
+        $gte: ตรงกับค่าที่มากกว่าหรือเท่ากับค่าที่ระบุ A >= B
+            Example: {"timestamp": {"$gte": 1734708600000}} (timestamp >= 1734708600000).
+        $lt: ตรงกับค่าที่ต่ำกว่าค่าที่ระบุ  A < B
+            Example: {"timestamp": {"$lt": 1734708700000}} (timestamp < 1734708700000).
+        $lte: ตรงกับค่าที่น้อยกว่าหรือเท่ากับค่าที่ระบุ A <= B
+            Example: {"timestamp": {"$lte": 1734708700000}} (timestamp <= 1734708700000).
+            
+        {"timestamp": {"$gte": timestamp_min, "$lte": timestamp_max}}
     """
-    resp = list(db[table_collection].find().sort("timestamp", -1))
+    timestamp_min = timeLoadAPI(req.datefrom) if req.datefrom != "" else 0
+    timestamp_max = timeLoadAPI(req.dateto) if req.dateto != "" else 0
+    
+    where_Oj = {}
+    notWhere = False
+    if timestamp_min != 0 and timestamp_max == 0:
+        where_Oj = {"timestamp":{"$gte": timestamp_min}}
+    if timestamp_max != 0 and timestamp_min == 0:
+        where_Oj = {"timestamp":{ "$lte": timestamp_max}}
+    if timestamp_max != 0 and timestamp_min != 0:
+        where_Oj = {"timestamp":{ "$gte": timestamp_min , "$lte": timestamp_max}}
+    if timestamp_max == 0 and timestamp_min == 0:
+        notWhere = True
+    resp = list(db[table_collection].find(where_Oj).sort("timestamp", -1))
+    langthData = len(resp)
+    print(langthData)
+    isdata = len(list(db[table_collection].find()))
     
     # ถ้า ไม่มี data ให้ Getdata
-    if resp == []:
+    if isdata == 0 :
     #if True:
         # Non data
         starttime = 0
         endtime = 0
-        lengtbar_ = 3
-        limit_ = 3
+        lengtbar_ = 1000
+        limit_ = 1000
         get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Empty,starttime ,endtime)
         resp = list(db[table_collection].find())
     else:
@@ -138,18 +330,13 @@ def LoadPrice(req:req_getprice):
         #   - (ใช้เวลา เก่าสุดใน Data) - (เวลาที่ส่ง Post มา (req.datefrom))
         print('######################################################################################')
         endbar = len(resp)-1
-        data_last_time= resp[0]['timestamp']
-        data_start_time= resp[endbar]['timestamp']
-        req_strptime_end = 0 if req.dateto == "" else timeLoadAPI(req.dateto)
+        data_last_time= resp[0]['timestamp'] if len(resp) != 0 else timestamp_min
+        data_start_time= resp[endbar]['timestamp'] if len(resp) != 0 else 0
+        req_strptime_end = 0 if req.dateto == "" else timestamp_max
 
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         current_timestamp =timeLoadAPI(current_time)
         calbar = 0
-        # print(CaldateTime(current_timestamp/1000))
-
-        
-        #print(CaldateTime(req_strptime_end/1000))
-        #print(CaldateTime(req_strptime_last))
         """
          lengtbar_ = จำนวนแท่งทั้งหมดที่ Load TF 1m เท่านั้น
          60000 = 60*1000 = 1m
@@ -178,7 +365,7 @@ def LoadPrice(req:req_getprice):
             
         # Load add Time
         if req.datefrom != "":
-            req_strptime_start = timeLoadAPI(req.datefrom)
+            req_strptime_start = timestamp_min
 
             if req_strptime_start < data_start_time  :
                 calbar = data_start_time -req_strptime_start
@@ -189,15 +376,83 @@ def LoadPrice(req:req_getprice):
                 starttime = data_start_time  
                 endtime = data_start_time
                 get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Load,starttime ,endtime)
-            
-    resp = list(db[table_collection].find().sort("timestamp", -1))
+                
+                
+    resp = list(db[table_collection].find().sort("timestamp", -1))            
+    #@where_Out = {}
+    #@if timestamp_min != 0:
+    #@    where_Out = {"timestamp":{ "$gte": timestamp_min , "$lte": timestamp_max}}
+    #@if req.getAll:
+    #@    resp = list(db[table_collection].find().sort("timestamp", -1))
+    #@else:
+    #@    if notWhere:
+    #@        resp = list(db[table_collection].find().sort("timestamp", -1).limit(1000))
+    #@    else:
+    #@        
     return resp
    ######################################################################################
    ######################################################################################
    ######################################################################################
    ######################################################################################
 
+def Load_bar_lazy(req:req_getprice):
+    """ Load Add bar 1000
+    Load Day to Day
+    Load Day to Limit
+    if Not have bar data set to load from API
+    
+    Returns:
+        _type_: _description_
+    """
+    table_collection = req.symbol+'_'+req.tf 
+    # Output XRPUSDT_1m
+    print("table_collection:",table_collection)
+    query = None
+    if query is None:
+        query = {}
+    timestamp_min = timeLoadAPI(req.datefrom) if req.datefrom != "" else 0
+    timestamp_max = timeLoadAPI(req.dateto) if req.dateto != "" else 0
+    """
+        $gt:  A > B
+        $lt:  A < B
+        $gte: A >= B
+        $lte: A <= B
+    """
+    where_Oj = {}
+    notWhere = False
+    if timestamp_min != 0 and timestamp_max == 0:
+        where_Oj = {"timestamp":{"$gte": timestamp_min}}
+    if timestamp_max != 0 and timestamp_min == 0:
+        where_Oj = {"timestamp":{ "$lte": timestamp_max}}
+    if timestamp_max != 0 and timestamp_min != 0:
+        where_Oj = {"timestamp":{ "$gte": timestamp_min , "$lte": timestamp_max}}
+    if timestamp_max == 0 and timestamp_min == 0:
+        notWhere = True
+    resp = list(db[table_collection].find(where_Oj).sort("timestamp", -1))
+    langthData = len(resp)
+    print(langthData)
+    if langthData < 999 :
+        data = list(db[table_collection].find().sort("timestamp", -1))
+        isdata = len(data)
+        endbar = isdata-1
+        data_start_time= data[endbar]['timestamp'] if isdata != 0 else 0
 
+        # Load add Time
+        if req.datefrom != "":
+            req_strptime_start = timestamp_min
+            if req_strptime_start < data_start_time  :
+                calbar = data_start_time -req_strptime_start
+                if calbar >= 60000:
+                    lengtbar_ = int(calbar/60000)
+
+                limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_    
+                starttime = data_start_time  
+                endtime = data_start_time
+                get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Load,starttime ,endtime)
+                
+    resp = list(db[table_collection].find(where_Oj).sort("timestamp", -1).limit(1000))            
+    
+    return resp
 
 
 def load_data_SETTime(symbol, interval, limit, lastEndTime):

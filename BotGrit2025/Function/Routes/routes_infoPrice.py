@@ -4,7 +4,9 @@ from Function.Service.sv_infoPrice import (LoadPrice,load_date,
                                            load_data,
                                            dateTime_To_timestamp,
                                            deleteData,
-                                           timeLoadAPI)
+                                           timeLoadAPI,
+                                           Load_bar_lazy,
+                                           LoadPrice_Start)
 
 import json
 from datetime import datetime,timedelta
@@ -46,6 +48,50 @@ def getprice(req: req_getprice):
         resps = JSONResponse(content=resp_converted)
         
         return resps
+    
+@r_infoPrice.post("/infoPrice/getprice_start")
+def getprice(req: req_getprice):
+        """
+        Model send Post on Postman
+        {
+            "symbol":"XRPUSDT",
+            "tf":"1m",
+            "getAll": false,
+            "datefrom":"18-12-2024",
+            "dateto":"18-12-2025",
+            "ohlc":"ohlc"
+        }
+        """
+        resp= []
+        resp = LoadPrice_Start(req)
+        print(type(resp))
+        resp_converted = convert_objectid(resp)
+        resps = JSONResponse(content=resp_converted)
+        
+        return resps
+    
+@r_infoPrice.post("/infoPrice/Load_bar_lazy")
+def Loadbarlazy(req: req_getprice):
+        """
+        Model send Post on Postman
+        {
+            "symbol":"XRPUSDT",
+            "tf":"1m",
+            "getAll": false,
+            "datefrom":"18-12-2024",
+            "dateto":"18-12-2025",
+            "ohlc":"ohlc"
+        }
+        """
+        resp= []
+        resp = Load_bar_lazy(req)
+        print(type(resp))
+        resp_converted = convert_objectid(resp)
+        resps = JSONResponse(content=resp_converted)
+        
+        return resps
+    
+
 @r_infoPrice.get("/infoPrice/date")
 def get_ValibleDateData():
     print(" sss")

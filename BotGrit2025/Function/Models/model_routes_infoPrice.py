@@ -7,6 +7,7 @@ class req_getprice(BaseModel):
     getAll: bool
     datefrom: str
     dateto: str
+    limit: int
     ohlc:str # o | h |c | l | all
     
 class resp_price(BaseModel):

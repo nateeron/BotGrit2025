@@ -251,18 +251,17 @@
         //*************************************************************************************
         // Call API [Post] 'http://127.0.0.1:45441/infoPrice/getprice'
         //*************************************************************************************
-        async function fetchData(req,path) {
+        async function fetchData(req) {
             console.log(req)
             // Create the data to send in the POST request
-            const urldata = 'http://127.0.0.1:45441/infoPrice/'+path
+            const urldata = 'http://127.0.0.1:45441/infoPrice/getprice'
             const requestData = {
                 symbol: symbo,
                 tf: TimeFream,
                 getAll: false,
                 datefrom:req.Time_min,
                 dateto:req.Time_max,
-                ohlc: "ohlc",
-                limit:1000
+                ohlc: "ohlc"
             };
             console.log(requestData)
 
@@ -290,28 +289,7 @@
                 symbol:Symbol, interval:Interval,Time_min:loadTime_min,Time_max:loadTime_max,limit:Limit
             }
             try {
-                const getprice = "getprice_start"
-                const data = await fetchData(req,getprice);
-                allData = allData.concat(data);
-                const resp = SortData(allData)
-                const validData = validateData(resp);
-                const noDuplicatesData = removeDuplicates(validData);
-
-                return noDuplicatesData;
-            } catch {
-                return null
-
-            }
-        }
-
-        async function fetchLoad_bar_lazy(Symbol, Interval,loadTime_min, loadTime_max, Limit) {
-            let allData = [];
-            const req = {
-                symbol:Symbol, interval:Interval,Time_min:loadTime_min,Time_max:loadTime_max,limit:Limit
-            }
-            try {
-                const getprice = "Load_bar_lazy"
-                const data = await fetchData(req,getprice);
+                const data = await fetchData(req);
                 allData = allData.concat(data);
                 const resp = SortData(allData)
                 const validData = validateData(resp);
@@ -399,7 +377,6 @@
         //*************************************************************************************
         let processedData = null
         let isLoading = false;
-        let isLoading_s = false;
         let startTimestamp = null; 
         // อ้างอิง : https://developers.binance.com/docs/binance-spot-api-docs/rest-api
         async function fetchHistoricalData(symbol, interval, limit) {
@@ -494,17 +471,12 @@
             if (!visibleRange) return;
         
             const barsInfo = candlestickSeries.barsInLogicalRange(visibleRange);
-            console.log(barsInfo)
-            if (barsInfo && barsInfo.barsBefore < -20 && !isLoading_s) {
+        
+            if (barsInfo && barsInfo.barsBefore < 10) {
                 console.log("Loading more bars...");
                 loadMoreBars(symbo, TimeFream); // Adjust symbol and interval as necessary
-                isLoading_s = false
-                //setTimeout(() => {
-                //    
-                //}, 2*1000);
             }
         }
-        
         function formatTimestamp(timestamp) {
             // Convert the Unix timestamp to milliseconds
             const date = new Date(timestamp * 1000);
@@ -530,7 +502,7 @@
             if (isLoading || !startTimestamp) return; // Prevent multiple calls
         
             isLoading = true;
-            isLoading_s = true
+        
             try {
                 const UTCBangkok = 7 * 60 * 60;
         
@@ -539,11 +511,10 @@
                 const loadTime_max = formatTimestamp(startTimestamp-60+UTCBangkok)
                 const loadTime_min= formatTimestamp(startTimestamp-loadBar+UTCBangkok)
                 console.log(symbol, interval,loadTime_min, loadTime_max, 1000)
-                const additionalKlines = await fetchLoad_bar_lazy(symbol, interval,loadTime_min, loadTime_max, 1000);
+                const additionalKlines = await fetchAllKlines(symbol, interval,loadTime_min, loadTime_max, 1000);
                 console.log("additionalKlines",additionalKlines)
         
                 if (additionalKlines && additionalKlines.length > 0) {
-
                     const moreData = additionalKlines.map(item => ({
                         time: Math.floor(item.timestamp / 1000 + UTCBangkok), // Convert milliseconds to seconds
                         open: parseFloat(item.open),
@@ -555,7 +526,6 @@
                     // Add new data to the beginning of the current data
                     processedData = [...moreData, ...processedData];
                     candlestickSeries.setData(processedData); // Update the chart
-                console.log("processedData",processedData)
         
                     // Update the startTimestamp
                     startTimestamp = moreData[0].time;
@@ -595,6 +565,20 @@
             };
         }
 
+        function intervalInSeconds(interval) {
+            switch (interval) {
+
+                case '1m': return 60;
+                case '15m': return 15 * 60;
+                case '30m': return 30 * 60;
+                case '1h': return 60 * 60;
+                case '2h': return 2 * 60 * 60;
+                case '4h': return 4 * 60 * 60;
+                case '1d': return 24 * 60 * 60;
+                default: return 60;
+            }
+        }
+        
         let interval;
         let symbolName = 'XRPUSDT TF: 1m';
         

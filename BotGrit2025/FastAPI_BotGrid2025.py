@@ -5,6 +5,12 @@ from pydantic import BaseModel
 import asyncio
 from typing import AsyncGenerator
 import time
+
+from Function.Routes.routes import price_router
+from Function.Routes.routes_ConfigBot import r_ConfigBot
+from Function.Routes.routes_infoPrice import r_infoPrice
+
+
 # Initialize the FastAPI app
 app = FastAPI()
 
@@ -22,6 +28,12 @@ app.add_middleware(
     allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
 )
+
+# Include your routers
+app.include_router(price_router)
+app.include_router(r_ConfigBot)
+app.include_router(r_infoPrice)
+
 
 # Create a shared queue for SSE messages
 message_queue = asyncio.Queue()
@@ -58,4 +70,5 @@ async def get_events() -> StreamingResponse:
 # Run the Uvicorn server
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=45441, reload=True)
+    uvicorn.run("FastAPI_BotGrid2025:app", host="127.0.0.1", port=45441, reload=1)
+
