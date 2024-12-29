@@ -166,14 +166,14 @@ def LoadPrice_Start(req:req_getprice):
     print(langthData)
     #isdata = len(list(db[table_collection].find()))
     isdata = langthData 
-    
+    req_lengtbar_ = 10000 if req.limit == 0 else req.limit
     # ถ้า ไม่มี data ให้ Getdata
     if isdata == 0 :
     #if True:
         # Non data
         starttime = 0
         endtime = 0
-        lengtbar_ = 1000
+        lengtbar_ = req_lengtbar_ -1000  if  req_lengtbar_ >= 2000 else req_lengtbar_
         limit_ = 1000
         get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Empty,starttime ,endtime)
         resp = list(db[table_collection].find())
@@ -197,6 +197,7 @@ def LoadPrice_Start(req:req_getprice):
          60000 = 60*1000 = 1m
         """
         lengtbar_ = 0
+        
         # Update Time
         if current_timestamp > data_last_time:
             calbar = current_timestamp - data_last_time
@@ -231,7 +232,7 @@ def LoadPrice_Start(req:req_getprice):
                 endtime = data_start_time
                 get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Load,starttime ,endtime)
                 
-    resp = list(db[table_collection].find().sort("timestamp", -1).limit(1000))            
+    resp = list(db[table_collection].find().sort("timestamp", -1).limit(req_lengtbar_))            
   
     return resp
 
@@ -450,7 +451,7 @@ def Load_bar_lazy(req:req_getprice):
                 endtime = data_start_time
                 get_data(req,req.symbol,lengtbar_,limit_,IsUpdate.Load,starttime ,endtime)
                 
-    resp = list(db[table_collection].find(where_Oj).sort("timestamp", -1).limit(1000))            
+    resp = list(db[table_collection].find(where_Oj).sort("timestamp", -1))            
     
     return resp
 
@@ -643,10 +644,10 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_,isUpdate ,starttime = 0 
             x = load_data(symbol_, req.tf, limit_, starttime,endtime)
             data_ALL.extend(x)  # Use extend to add elements of x to data_ALL
             
-            #if len(x) > 0 :
-                #st = StartNewTime(interval, limit_)
-                #startTime = x[0][0] - st
-                #loadTime.append(startTime)
+            if len(x) > 0 :
+                st = StartNewTime(interval, limit_)
+                startTime = x[0][0] - st
+                loadTime.append(startTime)
             # --------------------------------------------------
         else:
             """

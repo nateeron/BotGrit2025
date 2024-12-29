@@ -530,12 +530,12 @@
             if (isLoading || !startTimestamp) return; // Prevent multiple calls
         
             isLoading = true;
-            isLoading_s = true
+            isLoading_s = false
             try {
                 const UTCBangkok = 7 * 60 * 60;
         
                 // Fetch additional 1000 bars before the current startTimestamp
-                const loadBar =  (1000 *60)
+                const loadBar =  (10000 *60)
                 const loadTime_max = formatTimestamp(startTimestamp-60+UTCBangkok)
                 const loadTime_min= formatTimestamp(startTimestamp-loadBar+UTCBangkok)
                 console.log(symbol, interval,loadTime_min, loadTime_max, 1000)
