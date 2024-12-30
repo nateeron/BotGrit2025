@@ -9,8 +9,12 @@ import time
 from Function.Routes.routes import price_router
 from Function.Routes.routes_ConfigBot import r_ConfigBot
 from Function.Routes.routes_infoPrice import r_infoPrice
+from Function.Routes.routes_BotGrid import r_botgrid
+import websocket
+import json
+from threading import Thread
 
-
+from websocket import WebSocketApp
 # Initialize the FastAPI app
 app = FastAPI()
 
@@ -33,6 +37,7 @@ app.add_middleware(
 app.include_router(price_router)
 app.include_router(r_ConfigBot)
 app.include_router(r_infoPrice)
+app.include_router(r_botgrid)
 
 
 # Create a shared queue for SSE messages
@@ -66,9 +71,10 @@ async def get_events() -> StreamingResponse:
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
-
 # Run the Uvicorn server
 if __name__ == "__main__":
+    
     import uvicorn
-    uvicorn.run("FastAPI_BotGrid2025:app", host="127.0.0.1", port=45441, reload=1)
+    uvicorn.run("FastAPI_BotGrid2025V41:app", host="127.0.0.1", port=45441, reload=1)
 
+   
