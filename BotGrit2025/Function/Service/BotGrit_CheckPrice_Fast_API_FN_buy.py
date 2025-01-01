@@ -117,7 +117,7 @@ class OrderManager:
         #--------------------------------------------------------------
         # 001
         table_collection = 'OrderBuy'
-        order_last = list(db[table_collection].find().sort("timestem_buy", -1).limit(3))  
+        order_last = list(db[table_collection].find().sort("UpdateDate", -1).limit(3))  
         #if len(order_last) != 0:  
         #    print(order_last[0])
         #    print(order_last[len(order_last)-1])
@@ -209,22 +209,21 @@ class OrderManager:
                 #--------------------------------------------------------------
                 # 004
                 order_last = list(db[table_collection].find({"status":0}).limit(3)) 
-                #if Oder_NaverBuy > 20:
-                #    #ASDF.Oder_NaverBuy = 0
-                #    Oder_NaverBuy = 0
-                #    print("***Oder_NaverBuy****")
-                #    print(Oder_NaverBuy)
-                #    Action_Buy(order,table_collection)
-                #    actionB = True
+                if Oder_NaverBuy > 20:
+                    #ASDF.Oder_NaverBuy = 0
+                    Oder_NaverBuy = 0
+                    print("***Oder_NaverBuy****")
+                    print(Oder_NaverBuy)
+                    Action_Buy(order,table_collection)
+                    actionB = True
                 P_Buys = price_start + ((price_start / 100) * percenB) 
                 crossunder = befo_price[0] >= befo_price[1]
-                if len(order_last) == 0 and req.price >= P_Buys and crossunder:
+                if len(order_last) == 0 :#and req.price >= P_Buys :
                     # Oder_NaverBuy += 1
                     # print("Oder_NaverBuy : >>>>>>>>>>>>> ",req.price)
                     Action_Buy(order,table_collection)
                     count_Buy += 1
                     # print(count_Buy,req.price)
-                    # ASDF.Oder_NaverBuy =ASDF.Oder_NaverBuy +1
                 
         #----------------------------------------------------------------------
         # 005
