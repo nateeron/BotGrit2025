@@ -7,6 +7,7 @@
     <title>Lightweight Charts with Binance WebSocket Data</title>
     <script
         src="https://cdn.jsdelivr.net/npm/lightweight-charts@3.6.0/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 
 </head>
 
@@ -14,7 +15,7 @@
     <style>
         #chart1 {
             width: 100%;
-            height: 100vh;
+            height: 80vh;
         }
 
         body {
@@ -73,7 +74,8 @@
                 textColor: '#E4E4E4',
                 background: { type: 'solid', color: '#202020' },
                 borderColor: '#63C20B',
-            }, timeScale: {
+            },
+            timeScale: {
                 timeVisible: true,
                 secondsVisible: false,
                 tickMarkFormatter: (time, tickMarkType, locale) => {
@@ -114,7 +116,7 @@
                 priceFormatter: myPriceFormatter,
             },
         };
-        
+
 
         const container = document.getElementById('chart1');
         const chart = LightweightCharts.createChart(container, chartOptions);
@@ -156,14 +158,14 @@
         //*************************************************************************************
         // Function
         //*************************************************************************************
-        
+
         function formatPrice(value, decimals) {
             return Number(value.toFixed(decimals));
         }
-        function CheckTimelineData(data){
+        function CheckTimelineData(data) {
             let t1 = data[0].timestamp;
             let t2 = data[1].timestamp;
-            if(t1 < t2) return true;
+            if (t1 < t2) return true;
             return false;
         }
 
@@ -187,7 +189,7 @@
 
             return maData;
         }
-        
+
         function StartNewTime(interval, factor) {
             // Define the number of seconds per interval unit
             const intervalUnits = {
@@ -210,11 +212,11 @@
 
             return totalSeconds;
         }
-        
+
         function validateData(data) {
             return data.filter(item => item !== null && item !== undefined);
         }
-        
+
         function removeDuplicates(data) {
             const seen = new Set();
             //const resp = data.filter(item => {
@@ -227,10 +229,10 @@
             });
             return resp
         }
-        
+
         function SortData(data) {
             // Sort the filtered data by time in ascending order
-          const sortedData = data.sort((a, b) =>   a.timestamp -b.timestamp);
+            const sortedData = data.sort((a, b) => a.timestamp - b.timestamp);
             //const sortedData = data.sort((a, b) => {
             //    console.log(a.timestamp);
             //});
@@ -250,18 +252,18 @@
         //*************************************************************************************
         // Call API [Post] 'http://127.0.0.1:45441/infoPrice/getprice'
         //*************************************************************************************
-        async function fetchData(req,path) {
+        async function fetchData(req, path) {
             console.log(req)
             // Create the data to send in the POST request
-            const urldata = 'http://127.0.0.1:45441/infoPrice/'+path
+            const urldata = 'http://127.0.0.1:45441/infoPrice/' + path
             const requestData = {
                 symbol: symbo,
                 tf: TimeFream,
                 getAll: false,
-                datefrom:req.Time_min,
-                dateto:req.Time_max,
+                datefrom: req.Time_min,
+                dateto: req.Time_max,
                 ohlc: "ohlc",
-                limit:1000
+                limit: 1000
             };
             console.log(requestData)
 
@@ -282,15 +284,60 @@
             }
             return data;
         }
-        
-        async function fetchAllKlines(Symbol, Interval,loadTime_min, loadTime_max, Limit) {
+
+        async function fetchData_MarkersBacktest(req, path) {
+            console.log(req)
+            // Create the data to send in the POST request
+            //const urldata = 'http://127.0.0.1:45441/botgrid/data_Backtest'
+            const urldata = 'http://127.0.0.1:45441/botgrid/' + path
+            const requestData = {
+                symbol: symbo,
+                price: 0,
+                tf: TimeFream,
+                DateFrom: 0,
+                DateTo: 0,
+
+            };
+            console.log(requestData)
+
+            // Send the POST request with JSON data
+            const response = await fetch(urldata, {
+                method: 'POST', // Use POST method
+                headers: {
+                    'Content-Type': 'application/json' // Set the content type to JSON
+                },
+                body: JSON.stringify(requestData) // Convert the JavaScript object to a JSON string
+            });
+
+            // Parse the response as JSON
+            const data = await response.json();
+            const isPass = CheckTimelineData(data)
+            if (!isPass) {
+                console.error("sort Timeline Data 0,1,2,3 ต้องจากน้อยไปมาก");
+            }
+            return data;
+        }
+        async function fetch_dataBackTest() {
+            let allData = [];
+            const req = {}
+            try {
+                const getprice = "data_Backtest"
+                const data = await fetchData_MarkersBacktest(req, getprice);
+
+                return data;
+            } catch {
+                return null
+
+            }
+        }
+        async function fetchAllKlines(Symbol, Interval, loadTime_min, loadTime_max, Limit) {
             let allData = [];
             const req = {
-                symbol:Symbol, interval:Interval,Time_min:loadTime_min,Time_max:loadTime_max,limit:Limit
+                symbol: Symbol, interval: Interval, Time_min: loadTime_min, Time_max: loadTime_max, limit: Limit
             }
             try {
                 const getprice = "getprice_start"
-                const data = await fetchData(req,getprice);
+                const data = await fetchData(req, getprice);
                 allData = allData.concat(data);
                 const resp = SortData(allData)
                 const validData = validateData(resp);
@@ -303,14 +350,14 @@
             }
         }
 
-        async function fetchLoad_bar_lazy(Symbol, Interval,loadTime_min, loadTime_max, Limit) {
+        async function fetchLoad_bar_lazy(Symbol, Interval, loadTime_min, loadTime_max, Limit) {
             let allData = [];
             const req = {
-                symbol:Symbol, interval:Interval,Time_min:loadTime_min,Time_max:loadTime_max,limit:Limit
+                symbol: Symbol, interval: Interval, Time_min: loadTime_min, Time_max: loadTime_max, limit: Limit
             }
             try {
                 const getprice = "Load_bar_lazy"
-                const data = await fetchData(req,getprice);
+                const data = await fetchData(req, getprice);
                 allData = allData.concat(data);
                 const resp = SortData(allData)
                 const validData = validateData(resp);
@@ -331,7 +378,7 @@
             resp = (startTime - start_time) / 60000
             return Math.ceil(resp)
         }
-        
+
         async function fetchData_LastReailTime(symbol, TF, start_timestamp) {
             // Create the data to send in the POST request
             const base_url = "https://api.binance.com/api/v3/klines";
@@ -391,40 +438,41 @@
 
             return formattedData;
         }
-        
-        
+
+
         //*************************************************************************************
         // [Start ]
         //*************************************************************************************
         let processedData = null
         let isLoading = false;
         let isLoading_s = false;
-        let startTimestamp = null; 
+        let startTimestamp = null;
+        let markers_backtest = null;
         // อ้างอิง : https://developers.binance.com/docs/binance-spot-api-docs/rest-api
         async function fetchHistoricalData(symbol, interval, limit) {
 
-            const rawKlines =await fetchAllKlines(symbol, interval,"","",1000);
-        
+            const rawKlines = await fetchAllKlines(symbol, interval, "", "", 1000);
+
             try {
-               const UTCBangkok = 7*60*60
+                const UTCBangkok = 7 * 60 * 60
                 processedData = rawKlines.map(item => ({
-                    time: Math.floor(item.timestamp / 1000+UTCBangkok), // Convert milliseconds to seconds
+                    time: Math.floor(item.timestamp / 1000 + UTCBangkok), // Convert milliseconds to seconds
                     open: parseFloat(item.open),
                     high: parseFloat(item.high),
                     low: parseFloat(item.low),
                     close: parseFloat(item.close)
                 }));
                 startTimestamp = processedData[0].time;
-                console.log("******************************** Load Reailtime *****************************")
-                console.log(processedData.length,startTimestamp)
+                //console.log("******************************** Load Reailtime *****************************")
+                //console.log(processedData.length,startTimestamp)
                 //********************************* Load Reailtime *********************************
-                console.log(processedData)
+                //console.log(processedData)
                 //close: 2.5194
                 //high: 2.5219
                 //low: 2.5188
                 //open: 2.5214
                 //time: 1734542280
-                
+
                 //const offsetUTC7 = 7 * 60 * 60 * 1000;
                 //const timestamp = rawKlines[rawKlines.length - 1].timestamp;
                 //const FromOutService = fetchData_LastReailTime(symbol, interval, timestamp)
@@ -459,28 +507,235 @@
                 //------ Start EMA20 -----------------
                 // EMA 20
 
-                updateMovingAverageSeries(processedData, maPeriod);
-                updateMovingAverageSeries2(processedData, maPeriod2);
+                //updateMovingAverageSeries(processedData, maPeriod);
+                //updateMovingAverageSeries2(processedData, maPeriod2);
+                //
+                ////------end EMA20 -----------------
+                //
+                //// add data
+                //candlestickSeries.setData(processedData);
 
-                //------end EMA20 -----------------
 
-                // add data
-                candlestickSeries.setData(processedData);
+                //------ markers arrowUp arrowDown-----------------
+                const DATA_Backtest = await fetch_dataBackTest();
+                console.log("DATA_Backtest")
+                console.log(DATA_Backtest)
                 //SeriesMarkerPosition: "aboveBar" | "belowBar" | "inBar"
                 //SeriesMarkerShape: "circle" | "square" | "arrowUp" | "arrowDown"
-                const markers = [
+                //const markers_backtest = DATA_Backtest.flatMap(item => [
+                //    {
+                //        time: Math.floor(item.timestem_buy / 1000), // Convert to seconds if needed
+                //        position: 'belowBar',
+                //        color: '#2A60C4',
+                //        shape: 'arrowUp',
+                //        text: `Buy @ ${item.priceAction}`
+                //    },
+                //    {
+                //        time: Math.floor(item.timestem_sell / 1000), // Convert to seconds if needed
+                //        position: 'aboveBar',
+                //        color: '#D753E9FF',
+                //        shape: 'arrowDown',
+                //        text: `Sell @ ${item.priceSell}`
+                //    }
+                //]);
+                const size = 1
+                let markers_backtests = null
+                markers_backtests = [
                     {
                         time: processedData[processedData.length - 3].time,
                         position: 'inBar',
                         color: '#2A60C4',
                         shape: 'arrowUp',
                         text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 10].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 15].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 20].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 25].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 30].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 35].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 40].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 50].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 60].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 70].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 80].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 90].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 100].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 110].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 120].time,
+
+                    },
+                    {
+                        time: processedData[processedData.length - 130].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 140].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 150].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 160].time,
+                        position: 'inBar',
+                        color: '#2A60C4',
+                        shape: 'arrowUp',
+                        text: 'Buy @ ' + processedData[1].low,
+                    }, {
+                        time: processedData[processedData.length - 170].time,
+                        position: 'inBar',
+                        shape: 'arrowUp',
                     },
 
                 ];
-                candlestickSeries.setMarkers(markers);
+                let sell_Multi = []
+
+                markers_backtest = DATA_Backtest.flatMap(item => {
+                    const matchingItems = sell_Multi.filter(x => x === item.timestem_sell); // Check if timestem_sell exists in sell_Multi
+                    let mess = "";
+                    if (matchingItems.length > 0) {
+                        console.log("*****************************************")
+                        console.log(matchingItems)
+                        if (matchingItems.length > 1) {
+                            mess = "> X" + (matchingItems.length + 1).toString(); // Use sell_Multi.length instead of ss.length()
+                        }
+                        else if (matchingItems.length == 2) {
+                            mess = ">> X" + (matchingItems.length + 1).toString(); // Use sell_Multi.length instead of ss.length()
+                        } else if (matchingItems.length == 3) {
+                            mess = ">>> X" + (matchingItems.length + 1).toString(); // Use sell_Multi.length instead of ss.length()
+
+                        } else if (matchingItems.length ==4) {
+                            mess = ">>>> X" + (matchingItems.length + 1).toString(); // Use sell_Multi.length instead of ss.length()
+
+                        } else if (matchingItems.length == 5) {
+                            mess = ">>>>> X" + (matchingItems.length + 1).toString(); // Use sell_Multi.length instead of ss.length()
+
+                        } else if (matchingItems.length == 6) {
+
+                            mess = ">>>>> X" + (matchingItems.length + 1).toString(); // Use sell_Multi.length instead of ss.length()
+                        }else{
+                            mess = ">>>>>> X" + (matchingItems.length + 1).toString(); // Use sell_Multi.length instead of ss.length()
+
+                        }
+                    }
+                    if (item.status == 0) {
+                        return [
+                            {
+                                time: Math.floor(item.timestem_buy / 1000 + UTCBangkok), // Convert to seconds if needed
+                                position: 'belowBar',
+                                color: '#4A9FE6FF',
+                                shape: 'arrowUp',
+                                text: `Buy @ ${item.priceAction}`,
+                                size: size
+                            }
+                        ];
+                    } else {
+                        sell_Multi.push(item.timestem_sell);
+                        return [
+                            {
+                                time: Math.floor(item.timestem_buy / 1000 + UTCBangkok), // Convert to seconds if needed
+                                position: 'belowBar',
+                                color: '#4A9FE6FF',
+                                shape: 'arrowUp',
+                                text: `Buy @ ${item.priceAction}`,
+                                size: size
+                            },
+                            {
+                                time: Math.floor(item.timestem_sell / 1000 + UTCBangkok), // Convert to seconds if needed
+                                position: 'aboveBar',
+                                color: '#DA46EEFF',
+                                background: '#EEEEEEFF',
+                                shape: 'arrowDown',
+                                text: `Sell @ ${item.priceSell}  ${mess}`,
+                                size: size
+                            }
+                        ];
+                    }
+                });
+
+                candlestickSeries.setMarkers(markers_backtest);
+                // Add a horizontal line at price level 110
+
                 runRealtimeUpdates(symbol, interval);
-               
+
                 chart.timeScale().subscribeVisibleLogicalRangeChange(onVisibleRangeChanged);
             } catch (Error) {
                 console.log(Error)
@@ -491,7 +746,7 @@
         function onVisibleRangeChanged(newLogicalRange) {
             const visibleRange = chart.timeScale().getVisibleLogicalRange();
             if (!visibleRange) return;
-        
+
             const barsInfo = candlestickSeries.barsInLogicalRange(visibleRange);
             console.log(barsInfo)
             if (barsInfo && barsInfo.barsBefore < -20 && !isLoading_s) {
@@ -502,8 +757,10 @@
                 //    
                 //}, 2*1000);
             }
+            candlestickSeries.setMarkers(markers_backtest);
+            chart.timeScale().getVisibleLogicalRange();
         }
-        
+
         function formatTimestamp(timestamp) {
             // Convert the Unix timestamp to milliseconds
             const date = new Date(timestamp * 1000);
@@ -511,8 +768,8 @@
             // Adjust for the timezone offset
             //const localDate = new Date(date.getTime() + timezoneOffset * 60 * 60 * 1000);
             //const localDate = new Date(date.getTime()-timezoneOffset * 60 * 60 * 1000);
-            const localDate = new Date(date.getTime()-timezoneOffset * 60 * 60 * 1000);
-        
+            const localDate = new Date(date.getTime() - timezoneOffset * 60 * 60 * 1000);
+
             // Format the date and time components
             const year = localDate.getUTCFullYear();
             const month = String(localDate.getUTCMonth() + 1).padStart(2, '0'); // Months are 0-based
@@ -520,27 +777,27 @@
             const hours = String(localDate.getUTCHours()).padStart(2, '0');
             const minutes = String(localDate.getUTCMinutes()).padStart(2, '0');
             const seconds = String(localDate.getUTCSeconds()).padStart(2, '0');
-        
+
             // Construct the formatted date string
             return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
         }
-        
+
         async function loadMoreBars(symbol, interval) {
             if (isLoading || !startTimestamp) return; // Prevent multiple calls
-        
+
             isLoading = true;
             isLoading_s = false
             try {
                 const UTCBangkok = 7 * 60 * 60;
-        
+
                 // Fetch additional 1000 bars before the current startTimestamp
-                const loadBar =  (10000 *60)
-                const loadTime_max = formatTimestamp(startTimestamp-60+UTCBangkok)
-                const loadTime_min= formatTimestamp(startTimestamp-loadBar+UTCBangkok)
-                console.log(symbol, interval,loadTime_min, loadTime_max, 1000)
-                const additionalKlines = await fetchLoad_bar_lazy(symbol, interval,loadTime_min, loadTime_max, 1000);
-                console.log("additionalKlines",additionalKlines)
-        
+                const loadBar = (10000 * 60)
+                const loadTime_max = formatTimestamp(startTimestamp - 60 + UTCBangkok)
+                const loadTime_min = formatTimestamp(startTimestamp - loadBar + UTCBangkok)
+                console.log(symbol, interval, loadTime_min, loadTime_max, 1000)
+                const additionalKlines = await fetchLoad_bar_lazy(symbol, interval, loadTime_min, loadTime_max, 1000);
+                console.log("additionalKlines", additionalKlines)
+
                 if (additionalKlines && additionalKlines.length > 0) {
 
                     const moreData = additionalKlines.map(item => ({
@@ -550,12 +807,12 @@
                         low: parseFloat(item.low),
                         close: parseFloat(item.close)
                     }));
-        
+
                     // Add new data to the beginning of the current data
                     processedData = [...moreData, ...processedData];
                     candlestickSeries.setData(processedData); // Update the chart
-                console.log("processedData",processedData)
-        
+                    console.log("processedData", processedData)
+
                     // Update the startTimestamp
                     startTimestamp = moreData[0].time;
                 }
@@ -570,15 +827,15 @@
             if (socket) {
                 socket.close();
             }
-                
-                // Get Price Reailtime
+
+            // Get Price Reailtime
             socket = new WebSocket(`wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_${interval}`);
 
             socket.onmessage = function (event) {
                 const message = JSON.parse(event.data);
-                const utcBangkok = 7*60*60
+                const utcBangkok = 7 * 60 * 60
                 const candle = {
-                    time: message.k.t / 1000 +utcBangkok,  // Convert milliseconds to seconds
+                    time: message.k.t / 1000 + utcBangkok,  // Convert milliseconds to seconds
                     open: parseFloat(message.k.o),
                     high: parseFloat(message.k.h),
                     low: parseFloat(message.k.l),
@@ -596,13 +853,13 @@
 
         let interval;
         let symbolName = 'XRPUSDT TF: 1m';
-        
+
         document.getElementById('timeframe').addEventListener('change', (event) => {
             interval = event.target.value;
             symbolName = 'XRPUSDT TF: ' + interval
             fetchHistoricalData(symbo, interval, 3000);
         });
-        
+
         const areaSeries = chart.addAreaSeries({
             topColor: '#2962FF',
             bottomColor: 'rgba(41, 98, 255, 0.28)',
@@ -702,7 +959,7 @@
                 tooltip.style.display = 'none'; // Hide tooltip if no time data
                 return;
             }
-        
+
             // Convert to milliseconds and adjust for Bangkok timezone (UTC+7)
             const timestamp = param.time * 1000; // Convert to milliseconds
             const bangkokTime = new Intl.DateTimeFormat('en-US', {
@@ -710,24 +967,24 @@
                 minute: '2-digit',
                 hour12: false,
             }).format(new Date(timestamp - (7 * 60 * 60 * 1000))); // Adjust for UTC+7
-        
+
             // Find the bar corresponding to the current time
             const bar = processedData.find(item => item.time === param.time);
-        
+
             if (bar) {
                 const closePrice = bar.close; //close Get the close price
                 const openPrice = bar.open; //close Get the close price
-        
+
                 // Set custom tooltip text with bar time and close price
                 tooltip.textContent = `Bar Time: ${bangkokTime} | Close: ${closePrice} Open:${openPrice}`;
-        
+
                 // Optional: Set background color based on bullish or bearish bar
                 if (bar.close > bar.open) {
                     tooltip.style.backgroundColor = '#4ab9a4'; // Bullish bar
                 } else {
                     tooltip.style.backgroundColor = '#C04444FF'; // Bearish bar
                 }
-        
+
                 // Position tooltip near the mouse pointer
                 tooltip.style.display = 'block';
                 tooltip.style.left = `${param.point.x + 10}px`;
@@ -784,7 +1041,35 @@
     </script>
 
 
- 
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container" style="height:100%;width:100%">
+        <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
+        <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow"
+                target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
+        <script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+            {
+                "autosize": true,
+                    "symbol": "BINANCE:XRPUSDT",
+                        "interval": "1",
+                            "timezone": "Asia/Bangkok",
+                                "theme": "dark",
+                                    "style": "1",
+                                        "locale": "en",
+                                            "withdateranges": true,
+                                                "hide_side_toolbar": false,
+                                                    "allow_symbol_change": true,
+                                                        "watchlist": [
+                                                            "BINANCE:BNBUSDT",
+                                                            "BINANCE:XRPUSDT",
+                                                            "BINANCE:BTCUSDT"
+                                                        ],
+                                                            "calendar": false,
+                                                                "hide_volume": true,
+                                                                    "support_host": "https://www.tradingview.com"
+            }
+        </script>
+    </div>
+    <!-- TradingView Widget END -->
 
 </body>
 

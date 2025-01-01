@@ -1,15 +1,15 @@
 import json
-import datetime
+from datetime import datetime
 import time
 # Load the JSON data from the file
 import pprint as pprint
 import Function.Service.FN_calAction as ta
 
 from Function.MongoDatabase import db
-from Function.Models.model_routes_botGrid import oj_Order
+from Function.Models.model_routes_botGrid import oj_Order,check_price
 from Function.Service.sv_botgrid import (fn_insertOrder,update_order_status)
 import Function.Service.BotSpot as  BotSpot
-
+from pydantic import BaseModel
 # with open('data.json') as f:
 #     data = json.load(f)
 
@@ -31,96 +31,227 @@ import Function.Service.BotSpot as  BotSpot
 #     print(order)
 ISDOING_ACTION = 0
 
+from bson import ObjectId
 
+class MongoEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, ObjectId):
+            return str(obj)  # Convert ObjectId to string
+        return super().default(obj)
+
+
+def convert_timestamp(timestamp:int):
+    """convert
+
+    Args:
+        timestamp (int): 1734591480000
+
+    Returns:
+        str : 19/12/2567 6:58:00
+    """
+    # Convert milliseconds to seconds
+    timestamp_sec = timestamp / 1000
+    # Convert to datetime
+    date_time = datetime.utcfromtimestamp(timestamp_sec)
+    # Format datetime as string
+    return date_time.strftime("%Y-%m-%d %H:%M:%S")
+
+def Action_Buy(req:oj_Order,table_collection):
+    
+    order_dict = req.dict()
+    db[table_collection].insert_one(order_dict)
+class ASDF(BaseModel):
+    Oder_NaverBuy:int
+    
+
+Oder_NaverBuy = 0
+count_Buy = 0
+befo_price = []
 class OrderManager:
+    
     def __init__(self):
         with open('config.json') as f:
             config = json.load(f)
         self.config = config
         
+    def check_price_buy(self,req:check_price):
+        global Oder_NaverBuy
+        global befo_price
+        global count_Buy
+        # ราคา ปิด จากกราฟ
+        """req
+        symbol='XRPUSDT' 
+        price=2.1095 
+        tf='1m' 
+        timestamp=1735722360000
+        """
+        #print('check_price_buy',req)
+        # ซื้อ
+        #--------------------------------------------------------------
+        # 001 เช็ก Data ว่ามี order ล่าสุด Action ที่กี่ usd
+        # 002 ถ้าไม่มี Action order ให้ set ราคาเริ่มต้น 
+        # 003 ถ้ามี Action order ให้เช็กว่า ซื้อ หรือขาย แล้ว นำราคา ที่ Action มาเป็นจุดซื้อถัดไป
+        # 004 กรณี ขายหมด แล้วราคาขึ้น ไม่มีจังหวะซื้อ 
+        # 005 เช็ก Sell
+        price = float(req.price)
+        befo_price_ = 0
+        if len(befo_price) == 0:
+            befo_price.append(price)
+            
+        elif len(befo_price) == 1:
+            befo_price_ = befo_price[0]
+            
+            befo_price.append(price)
+        elif len(befo_price) == 2:
+            befo_price_ = befo_price[0]
+            befo_price.pop(0)
+            befo_price.append(price)
+            
         
-    def check_price_buy(self,pri,symbol):
-        try:
-            priceActionLast = 999999999.99
-            price = float(pri)
-            status = 0 #| 0 = not Sell
-            orderby = "DATE_SELL" #  SYMBOL, PRICE_BUY, PRICE_SELL, STATUS, DATE_BUY, DATE_SELL 
-            limit = 1
-            table_collection = "OrderBuy"
-            # Get data last Buy
-            order_json = list(db[table_collection].find().sort("timestamp", -1))    
-            # order_json = qury.Select_tableOrder(status,symbol,orderby,limit)
-            if order_json != []:
-                #order_json = order_json
-                order = json.loads(order_json) if order_json else None
-                if order:
-                    status = order[0]['status'] # from SQL data
-                    # ถ้ายังไม่ขาย ให้นับจุดซื้อล่าสุด ลงมา
-                    if status == 1:
-                        priceActionLast = float(order[0]['Price_Sell'])
-                    else:
-                        priceActionLast = float(order[0]['Price'])
+        amount = 25
+        percenS = 1.5
+        percenB = 0.8
+        
+        qty ="{:.4f}".format(float(amount/price) )
+        P_Sell = price + ((price / 100) * percenS) 
+        #--------------------------------------------------------------
+        # 001
+        table_collection = 'OrderBuy'
+        order_last = list(db[table_collection].find().sort("timestem_buy", -1).limit(3))  
+        #if len(order_last) != 0:  
+        #    print(order_last[0])
+        #    print(order_last[len(order_last)-1])
+        price_start = 0
+        # ใน data -7 *1000
+        timestem_buy = req.timestamp
+        time_now = convert_timestamp(timestem_buy) 
+        actionB = False
+        #--------------------------------------------------------------
+        # 002
+        if len(order_last) == 0:
+            price_start = req.price
+            order = oj_Order(
+                            Order_id=1,
+                            status=0,
+                            OrderName="xrp tf1m test",
+                            symbol=req.symbol,
+                            timestem_buy=timestem_buy,
+                            timestem_sell=timestem_buy,
+                            priceAction=price_start,
+                            Buy_Quantity=qty,
+                            Buy_Amount=0,
+                            Buy_SumQuantity=0,
+                            Buy_SumAmount=0,
+                            priceSell=P_Sell,
+                            Sell_Quantity=qty,
+                            Sell_Amount=0,
+                            Sell_SumQuantit=0,
+                            Sell_SumAmount=0,
+                            CreateDate=time_now,
+                            UpdateDate=time_now,
+                            isDelete=0,
+                            isActive=1,
+                            MainOrder=0,
+                            SubOrder=0
+                        )
+            Action_Buy(order,table_collection)
+            actionB = True
+            count_Buy += 1
+            # print(count_Buy,req.price)
+        else:
+            #---------------------------------------------------------
+            # 003
+            Position = "BUY" if order_last[0]['status'] == 0 else "SELL" 
+            if Position == "BUY":
+                price_start =  order_last[0]['priceAction']
+            elif Position == "SELL":
+                price_start =  order_last[0]['priceSell']
+                
+            P_Buy = price_start - ((price_start / 100) * percenB) 
+            order = oj_Order(
+                            Order_id=1,
+                            status=0,
+                            OrderName="xrp tf1m test",
+                            symbol=req.symbol,
+                            timestem_buy=timestem_buy,
+                            timestem_sell=timestem_buy,
+                            priceAction=req.price,
+                            Buy_Quantity=qty,
+                            Buy_Amount=0,
+                            Buy_SumQuantity=0,
+                            Buy_SumAmount=0,
+                            priceSell=P_Sell,
+                            Sell_Quantity=qty,
+                            Sell_Amount=0,
+                            Sell_SumQuantit=0,
+                            Sell_SumAmount=0,
+                            CreateDate=time_now,
+                            UpdateDate=time_now,
+                            isDelete=0,
+                            isActive=1,
+                            MainOrder=0,
+                            SubOrder=0
+                        )
                
+            # 2.1191104000000003
+            # 2.1432 2.1434143999999997
+            
+            if req.price <= P_Buy :
+                #print(price_start)
+                #print(req.price ,"<= ",P_Buy,"=",req.price <= P_Buy)
+                #ASDF.Oder_NaverBuy = 0
+                Oder_NaverBuy = 0
+                Action_Buy(order,table_collection)
+                actionB = True
+                count_Buy += 1
+                # print(count_Buy,req.price)
+            else:
+                #--------------------------------------------------------------
+                # 004
+                order_last = list(db[table_collection].find({"status":0}).limit(3)) 
+                #if Oder_NaverBuy > 20:
+                #    #ASDF.Oder_NaverBuy = 0
+                #    Oder_NaverBuy = 0
+                #    print("***Oder_NaverBuy****")
+                #    print(Oder_NaverBuy)
+                #    Action_Buy(order,table_collection)
+                #    actionB = True
+                P_Buys = price_start + ((price_start / 100) * percenB) 
+                crossunder = befo_price[0] >= befo_price[1]
+                if len(order_last) == 0 and req.price >= P_Buys and crossunder:
+                    # Oder_NaverBuy += 1
+                    # print("Oder_NaverBuy : >>>>>>>>>>>>> ",req.price)
+                    Action_Buy(order,table_collection)
+                    count_Buy += 1
+                    # print(count_Buy,req.price)
+                    # ASDF.Oder_NaverBuy =ASDF.Oder_NaverBuy +1
                 
-            # Check buy 
-            next_Buy,percenB =  ta.calAction_Buy(priceActionLast,self.config)
+        #----------------------------------------------------------------------
+        # 005
+        if not actionB:
+            OrderSell = list(db[table_collection].find({"status":0,"symbol":req.symbol}).sort("priceSell", 1).limit(10))   
             
-            next_Buy = ta.f4(next_Buy)
+            #print("-----------------")
             
-            print('#######[ Check Buy ]#######')
-            print('is :',price <= next_Buy)
-            # ถ้าขาย ได้ไม้คืน จุกซื้อถึดไปจะนับจากจุดขายล่าสุด ลงมา 
-            print("price <= next_Buy: ",price ,'<=',next_Buy ,' %percenB :',percenB ,' priceActionLast :',priceActionLast)
-            
-            status = 0 #| 0 = not Sell
-            orderby = "DATE_SELL" #  SYMBOL, PRICE_BUY, PRICE_SELL, STATUS, DATE_BUY, DATE_SELL 
-            limit = 3
-            # Check Sell id, SYMBOL, PRICE_BUY, PRICE_SELL,QUANTITY, STATUS, DATE_BUY, DATE_SELL 
-            OrderSell = list(db[table_collection].find({"STATUS":status,"SYMBOL":symbol}).sort(orderby, 1).limit(limit))   
-            # OrderSell = qury.Select_tableOrder(status,symbol,orderby,limit)
-            
-            if price <= next_Buy :
-            #if True:
-                print("Action BUY")
-                order_quantity =float(self.config['ORDER_VAL'])
-                #  buy  sell
-                Price_Action =2.15 #BotSpot.trad(symbol,'buy',order_quantity,'','','')
-                # # เมื่อซื้อเสร็จ ให้ SAVE ราคาขาย
-                quantity = ta.f2( order_quantity/price )
-                P_Sell ,percenS =  ta.calAction_Sell(Price_Action,self.config)
-                # SYMBOL, PRICE_BUY, PRICE_SELL, STATUS, DATE_BUY
-                STATUS = 0
-                s = oj_Order
-                s.Order_id = 123 
-                req = fn_insertOrder(s)
-                #qury.Insert_tableOrder(symbol, Price_Action,ta.f4(P_Sell),STATUS,quantity)
-                    
-            
-            print('#######[ Check Sell ]#######')
-           
+            #for item in OrderSell:
+            #    a = item['priceAction']
+            #    b ="{:.4f}".format(item['priceSell'])
+            #    bd = item['priceSell']
+            #    c = item['CreateDate']
+            #    print(a,b,c)
             for item in OrderSell:
-                print('IF Market > mySell')
-                print( price,'>=', item['Price_sell'],price >= float(item['Price_sell']))
-                
-                if price >= float(item['Price_sell']) :
-                    print("Action SELL")
-                    Price_Action =BotSpot.trad(symbol,'sell',item['Quantity'],'','','')
-                    priceSell = price
-                    new_status = 1 
-                    s = oj_Order
-                    s.Order_id = 555 
-                    req = update_order_status()
-                    # qury.update_order_status(item['OrderActionID'],new_status,priceSell)
-        except Exception as e:
-            print('An exception occurred',e)
-
-
-
-
-order_manager_ = OrderManager()
-order_manager_.check_price_buy('0.5508','XRPUSDT')
-# current_timestamp = time.time()
-# print(current_timestamp)
-# current_datetime = datetime.datetime.fromtimestamp(current_timestamp)
-# print(current_datetime.strftime('%Y-%m-%d %H:%M:%S'))
-    
+                if req.price >= float(item['priceSell']) :
+                    update_data = {
+                            "status": 1,
+                            "timestem_sell": req.timestamp,
+                            "priceSell": req.price,
+                            "Sell_Quantity": item['Sell_Quantity'],
+                            "UpdateDate": time_now,  # current timestamp for UpdateDate
+                        }
+                    document_id = ObjectId(item["_id"])
+                        # Update the document in the collection
+                    db[table_collection].update_one(
+                            {"_id": document_id},  # Query to find the document by _id
+                            {"$set": update_data}  # Update fields with the new data
+                        )
+        

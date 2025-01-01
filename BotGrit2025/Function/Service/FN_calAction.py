@@ -3,10 +3,7 @@ import json
 
 def calAction_Buy(p,config):
     price = float(p)
-    
-    
     percen = float(config['PERCEN_BUY'])
-    
     price_ = price - ((price / 100) * percen) 
     return price_,percen
  
@@ -15,6 +12,7 @@ def calAction_Sell(p,config):
     percen = float(config['PERCEN_SELL'])
     price_ = price + ((price / 100) * percen) 
     return price_,percen 
+
 
 
 def f1(n):
@@ -31,4 +29,3 @@ def f4(n):
 
 
 
-print(f4(0.4955951))

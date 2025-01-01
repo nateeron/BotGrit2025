@@ -132,8 +132,6 @@ async def main():
     await fastapi_task
 # Run the Uvicorn server
 if __name__ == "__main__":
-    
-    #import uvicorn
-    #uvicorn.run("FastAPI_BotGrid2025:app", host="127.0.0.1", port=45441, reload=1)
-
-    asyncio.run(main())
+    #asyncio.run(main())
+    import uvicorn
+    uvicorn.run("FastAPI_BotGrid2025V4:app", host="127.0.0.1", port=45441, reload=1)

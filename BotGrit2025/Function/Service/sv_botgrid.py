@@ -27,7 +27,6 @@ def fn_insertOrder(req:oj_Order ):
     print("insertOrder **********")
     print(req)
     ojData = []
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     #for row in data:
     #    # Map row data to a dictionary
     #    oj = {

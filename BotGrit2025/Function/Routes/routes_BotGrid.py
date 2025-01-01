@@ -1,6 +1,8 @@
 from fastapi import APIRouter,HTTPException
-from Function.Models.model_routes_botGrid import req_bot
+from Function.Models.model_routes_botGrid import req_bot,infoPrice,backtest
 from Function.Service.sv_botgrid import (bot_start)
+import Function.Service.sv_botgrid_Backtest as bt 
+
 
 import json
 from datetime import datetime,timedelta
@@ -27,14 +29,13 @@ websocket_task = None
     
 @r_botgrid.get("/botgrid/run")
 def run():
-        return {"message": "OK RUNNING Botgrid"}
+    return {"message": "OK RUNNING Botgrid"}
 
 
 @r_botgrid.post("/botgrid/start")
 def start(req:req_bot):
     
     req = bot_start(req)
-    
     return {"message":req}
 
 
@@ -47,7 +48,6 @@ def on_close(ws):
 
 def on_open(ws):
     print("### opened ###")
-
 
 def on_message(ws, message):
     data = json.loads(message)
@@ -63,8 +63,7 @@ def on_message(ws, message):
         if price1:
             price1.pop(0)
         price1.append({"E":data["E"],"p":data["p"]})
-    
-    
+
     
 def start_websocket_blocking():
     global ws
@@ -130,4 +129,17 @@ async def stopWebsocket():
 
     
 
+@r_botgrid.post("/botgrid/Backtest")
+async def Backtest(req:backtest):
+    #1 Loda price
+    #2 loop Check price
+    #3 save price action
+    #4 show output and calcurate
+    resp = bt.Backtest_start(req)
+    return resp
 
+@r_botgrid.post("/botgrid/data_Backtest")
+async def data_Backtest(req:infoPrice):
+    print("data_Backtest")
+    resp = bt.data_Backtest()
+    return resp

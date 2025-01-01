@@ -11,7 +11,23 @@ class req_bot(BaseModel):
     #tp:float
     #alert:bool
     #alertTo:str
-  
+
+
+
+class check_price(BaseModel):
+    symbol:str
+    price:float
+    tf:str
+    timestamp:int
+class infoPrice(BaseModel):
+    symbol:str
+    price:float
+    tf:str
+    DateFrom:int
+    DateTo:int
+class backtest(BaseModel):
+    symbol:str
+    limit:int
 class insertOrder_(BaseModel):
     SYMBOL: str
     PRICE_BUY: str 
@@ -23,9 +39,11 @@ class insertOrder_(BaseModel):
     
 class oj_Order(BaseModel):
     Order_id: int
+    status:int
     OrderName: str
     symbol: str
-    timestem: int
+    timestem_buy: int
+    timestem_sell: int
     priceAction: float
     Buy_Quantity: float
     Buy_Amount: float
