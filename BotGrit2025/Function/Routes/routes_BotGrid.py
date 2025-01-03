@@ -1,5 +1,5 @@
 from fastapi import APIRouter,HTTPException
-from Function.Models.model_routes_botGrid import req_bot,infoPrice,backtest
+from Function.Models.model_routes_botGrid import req_bot,infoPrice,backtest,GetinfoBacktest
 from Function.Service.sv_botgrid import (bot_start)
 import Function.Service.sv_botgrid_Backtest as bt 
 
@@ -126,9 +126,6 @@ async def stopWebsocket():
     await stop_websocket()
     return JSONResponse(content={"message": "WebSocket connection stopped"})
 
-
-    
-
 @r_botgrid.post("/botgrid/Backtest")
 async def Backtest(req:backtest):
     #1 Loda price
@@ -139,7 +136,7 @@ async def Backtest(req:backtest):
     return resp
 
 @r_botgrid.post("/botgrid/data_Backtest")
-async def data_Backtest(req:infoPrice):
+async def data_Backtest(req:GetinfoBacktest):
     print("data_Backtest")
-    resp = bt.data_Backtest()
+    resp = bt.data_Backtest(req)
     return resp

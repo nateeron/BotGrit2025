@@ -4,7 +4,7 @@ from Function.Models.model_routes_infoPrice import req_getprice,IsUpdate,DeleteR
 from Function.Models.model_routes_botGrid import oj_Order
 import asyncio
 import requests
-from Function.Models.model_routes_botGrid import req_bot,infoPrice,check_price,backtest
+from Function.Models.model_routes_botGrid import req_bot,infoPrice,check_price,backtest,GetinfoBacktest
 from datetime import datetime,timedelta
 import json
 import Function.Service.BotGrit_CheckPrice_Fast_API_FN_buy as FN_buy
@@ -96,10 +96,11 @@ def Backtest_start(req:backtest):
     resps = JSONResponse(content=resp_converted)
     return resps
 
-def data_Backtest():
-    
+def data_Backtest(req:GetinfoBacktest):
+    print(req)
     table_collections = "OrderBuy"
-    datas = list(db[table_collections].find().sort("timestamp",1).limit(200))    
+    #datas = list(db[table_collections].find({"timestem_buy":{"$lte":req.DateFrom}}).sort("timestem_buy",1))    
+    datas = list(db[table_collections].find().sort("timestem_buy",1))    
     resp_converted = convert_objectid(datas)
     resps = JSONResponse(content=resp_converted)
     return resps

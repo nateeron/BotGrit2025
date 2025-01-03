@@ -70,9 +70,10 @@ befo_price = []
 class OrderManager:
     
     def __init__(self):
-        with open('config.json') as f:
-            config = json.load(f)
-        self.config = config
+        pass
+        # with open('config.json') as f:
+        #     config = json.load(f)
+        self.config = ""
         
     def check_price_buy(self,req:check_price):
         global Oder_NaverBuy

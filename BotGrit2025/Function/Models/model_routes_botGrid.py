@@ -19,6 +19,13 @@ class check_price(BaseModel):
     price:float
     tf:str
     timestamp:int
+    
+class GetinfoBacktest(BaseModel):
+    symbol:str
+    tf:str
+    DateFrom:int
+    limit:int
+    
 class infoPrice(BaseModel):
     symbol:str
     price:float

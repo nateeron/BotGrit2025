@@ -292,10 +292,9 @@
             const urldata = 'http://127.0.0.1:45441/botgrid/' + path
             const requestData = {
                 symbol: symbo,
-                price: 0,
                 tf: TimeFream,
-                DateFrom: 0,
-                DateTo: 0,
+                DateFrom: req.start_time,
+                limit: req.limit,
 
             };
             console.log(requestData)
@@ -317,9 +316,9 @@
             }
             return data;
         }
-        async function fetch_dataBackTest() {
+        async function fetch_dataBackTest(start_time, limit) {
             let allData = [];
-            const req = {}
+            const req = {start_time:start_time, limit:limit};
             try {
                 const getprice = "data_Backtest"
                 const data = await fetchData_MarkersBacktest(req, getprice);
@@ -517,7 +516,7 @@
 
 
                 //------ markers arrowUp arrowDown-----------------
-                const DATA_Backtest = await fetch_dataBackTest();
+                const DATA_Backtest = await fetch_dataBackTest(startTimestamp,1000);
                 console.log("DATA_Backtest")
                 console.log(DATA_Backtest)
                 //SeriesMarkerPosition: "aboveBar" | "belowBar" | "inBar"
@@ -539,133 +538,6 @@
                 //    }
                 //]);
                 const size = 1
-                let markers_backtests = null
-                markers_backtests = [
-                    {
-                        time: processedData[processedData.length - 3].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 10].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 15].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 20].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 25].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 30].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 35].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 40].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 50].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 60].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 70].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 80].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 90].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 100].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 110].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 120].time,
-
-                    },
-                    {
-                        time: processedData[processedData.length - 130].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 140].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 150].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 160].time,
-                        position: 'inBar',
-                        color: '#2A60C4',
-                        shape: 'arrowUp',
-                        text: 'Buy @ ' + processedData[1].low,
-                    }, {
-                        time: processedData[processedData.length - 170].time,
-                        position: 'inBar',
-                        shape: 'arrowUp',
-                    },
-
-                ];
                 let sell_Multi = []
 
                 markers_backtest = DATA_Backtest.flatMap(item => {
@@ -730,8 +602,9 @@
                         ];
                     }
                 });
-
+                if (markers_backtest.length > 0) {
                 candlestickSeries.setMarkers(markers_backtest);
+                }
                 // Add a horizontal line at price level 110
 
                 runRealtimeUpdates(symbol, interval);
