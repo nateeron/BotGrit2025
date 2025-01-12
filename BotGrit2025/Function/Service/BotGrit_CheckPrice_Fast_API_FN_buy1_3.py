@@ -82,7 +82,8 @@ class OrderManager:
         
         
     def check_price_buy(self,data):
-        
+        """
+        For BackTEST Fast"""
         
         for ind,x in enumerate(data):
             
@@ -159,30 +160,6 @@ class OrderManager:
             else:
 
                 if self.Oder_NaverBuy > 20:
-                    #order = oj_Order(
-                    #                Order_id=self.id_counter+1,
-                    #                status=0,
-                    #                OrderName="xrp tf1m test",
-                    #                symbol=req.symbol,
-                    #                timestem_buy=req.timestamp,
-                    #                timestem_sell=req.timestamp,
-                    #                priceAction=req.price,
-                    #                Buy_Quantity=qty,
-                    #                Buy_Amount=0,
-                    #                Buy_SumQuantity=0,
-                    #                Buy_SumAmount=0,
-                    #                priceSell=P_Sell,
-                    #                Sell_Quantity=qty,
-                    #                Sell_Amount=0,
-                    #                Sell_SumQuantit=0,
-                    #                Sell_SumAmount=0,
-                    #                CreateDate=time_now,
-                    #                UpdateDate=time_now,
-                    #                isDelete=0,
-                    #                isActive=1,
-                    #                MainOrder=0,
-                    #                SubOrder=0
-                    #            )
                     order = {
                         "Order_id": self.id_counter,
                         "status": 0,

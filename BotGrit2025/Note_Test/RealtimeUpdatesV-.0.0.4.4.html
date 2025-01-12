@@ -462,10 +462,10 @@
                     close: parseFloat(item.close)
                 }));
                 startTimestamp = processedData[0].time;
-                //console.log("******************************** Load Reailtime *****************************")
-                //console.log(processedData.length,startTimestamp)
+                console.log("******************************** Load Reailtime *****************************")
+                console.log(processedData.length,startTimestamp)
                 //********************************* Load Reailtime *********************************
-                //console.log(processedData)
+                console.log(processedData)
                 //close: 2.5194
                 //high: 2.5219
                 //low: 2.5188
@@ -512,7 +512,7 @@
                 ////------end EMA20 -----------------
                 //
                 //// add data
-                //candlestickSeries.setData(processedData);
+                candlestickSeries.setData(processedData);
 
 
                 //------ markers arrowUp arrowDown-----------------
@@ -539,7 +539,7 @@
                 //]);
                 const size = 1
                 let sell_Multi = []
-
+                if(DATA_Backtest){
                 markers_backtest = DATA_Backtest.flatMap(item => {
                     const matchingItems = sell_Multi.filter(x => x === item.timestem_sell); // Check if timestem_sell exists in sell_Multi
                     let mess = "";
@@ -603,15 +603,20 @@
                     }
                 });
                 if (markers_backtest.length > 0) {
-                candlestickSeries.setMarkers(markers_backtest);
-                }
+                    candlestickSeries.setMarkers(markers_backtest);
+                    }
+            }
+              
                 // Add a horizontal line at price level 110
-
+                console.log("1111111111")
                 runRealtimeUpdates(symbol, interval);
+                console.log("22222222222")
 
                 chart.timeScale().subscribeVisibleLogicalRangeChange(onVisibleRangeChanged);
+                console.log("3333333")
+
             } catch (Error) {
-                console.log(Error)
+                console.error("Error",Error)
 
             }
         }
@@ -621,7 +626,6 @@
             if (!visibleRange) return;
 
             const barsInfo = candlestickSeries.barsInLogicalRange(visibleRange);
-            console.log(barsInfo)
             if (barsInfo && barsInfo.barsBefore < -20 && !isLoading_s) {
                 console.log("Loading more bars...");
                 loadMoreBars(symbo, TimeFream); // Adjust symbol and interval as necessary
@@ -630,7 +634,10 @@
                 //    
                 //}, 2*1000);
             }
-            candlestickSeries.setMarkers(markers_backtest);
+            if(markers_backtest){
+
+                candlestickSeries.setMarkers(markers_backtest);
+            }
             chart.timeScale().getVisibleLogicalRange();
         }
 

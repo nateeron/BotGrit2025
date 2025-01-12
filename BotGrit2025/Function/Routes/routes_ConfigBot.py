@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from flask import Flask, request
 # from Service.crud import create_tables
 from Function.Service.crud import create_tables
@@ -8,7 +8,7 @@ import ccxt
 import pprint as pprint
 from binance.client import Client
 from datetime import datetime, timedelta
-
+import json
 
 
 r_ConfigBot = APIRouter()
@@ -134,13 +134,38 @@ def getBalance():
                             "free_balance": free_balance,
                             "value_in_usdt": round(value_in_usdt, 2)
                         })
+        #resp = []
+        #sum_balance = 0
+        #sorted_balances = sorted(filtered_balances, key=lambda x: x['value_in_usdt'], reverse=True)
+        #for entry in filtered_balances:
+        #    sum_balance +=entry['value_in_usdt']
+        #    print(f"Asset: {entry['asset']}, Free Balance: {entry['free_balance']}, Value in USDT: {entry['value_in_usdt']}")
+        #    resp.append(f"Asset: {entry['asset']}, Free Balance: {entry['free_balance']}, Value in USDT: {entry['value_in_usdt']}")
+        #resp.append(f"Sum balance: {(sum_balance):.2f} : THB x35 ={(sum_balance*35):.2f} ")
+        #return resp
         resp = []
         sum_balance = 0
+
+        # Add item price and sort by 'value_in_usdt' in descending order
         for entry in filtered_balances:
-            sum_balance +=entry['value_in_usdt']
-            print(f"Asset: {entry['asset']}, Free Balance: {entry['free_balance']}, Value in USDT: {entry['value_in_usdt']}")
-            resp.append(f"Asset: {entry['asset']}, Free Balance: {entry['free_balance']}, Value in USDT: {entry['value_in_usdt']}")
-        resp.append(f"Sum balance: {(sum_balance):.2f} : THB x35 ={(sum_balance*35):.2f} ")
+            entry['item_price'] = entry['value_in_usdt'] * 35  # Example of item price calculation
+
+        # Sort filtered_balances by 'value_in_usdt' in descending order
+        sorted_balances = sorted(filtered_balances, key=lambda x: x['value_in_usdt'], reverse=True)
+
+        for entry in sorted_balances:
+            sum_balance += entry['value_in_usdt']
+            print(
+                f"Asset: {entry['asset']}, Free Balance: {entry['free_balance']}, "
+                f"Value in USDT: {entry['value_in_usdt']}, Item Price: {entry['item_price']:.2f}"
+            )
+            resp.append(
+                f"Asset: {entry['asset']}, Free Balance: {entry['free_balance']}, "
+                f"Value in USDT: {entry['value_in_usdt']}, Item Price: {entry['item_price']:.2f}"
+            )
+
+        # Add total balance and its equivalent in THB
+        resp.append(f"Sum balance: {sum_balance:.2f} USDT : THB x35 = {sum_balance * 35:.2f}")
         return resp
 
 # Helper function to convert balances to USDT
@@ -166,5 +191,50 @@ def report_Sumary():
         print(snapshots['snapshotVos'])
         
         return snapshots
+
+
+@r_ConfigBot.get('/ConfigBot/getSetting')
+def getdata():
+    settings =[]
+    with open("Setting.js", "r") as js_files:
+        js_code = js_files.read()
+
+        # Parse the JSON string into a Python dictionary
+        data = js_code.split('=')[1]
+        settings = { "System_Setting": json.loads(data) }
+        # Add Detail
+        #oj = {"note ReOpen_Order":" ON : OFF",
+        #      "note Margin_Type":" CROSSED : ISOLATED" ,
+        #      "openlong": {"side": "openlong", "amount": "@623", "symbol": "", "passphrase": "" },
+        #      "openshort": {"side": "openshort", "amount": "@623", "symbol": "", "passphrase": "" },
+        #      "closelong": {"side": "closelong", "amount": "@623", "symbol": "", "passphrase": "" },
+        #      "closeshort": {"side": "closeshort", "amount": "@623", "symbol": "", "passphrase": "" },
+        #      }
+        #
+        #settings.update(oj)
+        
+        
+    return settings
+# data = {
+#     "API_Key" : "iA99BK1DUaY58jE3pA3boVerKzcHcytxNjjdm0ePvSGck3QVbBwHfL6HkviaHoL2",
+#     "API_SECRET" : "IJSDequryfJWk75U4gEFdgRofyFsyqdycZpOKmdYUVKstSQ6KfgJYaslYjPk353F",
+#     "LineToken" : "VLk6TnJfmJ9hRQNEhBwBDS0MGDMoUl3XsJPgba7KS2p",
+#     "PassWord" : "ec7603f9-2d8b-5826-b98d-27b7fcf2b70a" ,
+#     "ReOpen_Order" : 'ON', 
+#     "Margin_Type" : 'CROSSED',
+#     "isTEST" : 0,
+# }  
+
+@r_ConfigBot.post('/ConfigBot/update')
+async def update(req: Request):
+    req_data = await req.json()
+    print(req_data)
+    print(type(req_data))
+    
+    # Writing request data to Setting.js file
+    with open("Setting.js", "w") as js_file:
+        js_file.write("var data = " + json.dumps(req_data))
+        
+    return "Success"
        
        

@@ -7,7 +7,10 @@ import requests
 from Function.Models.model_routes_botGrid import req_bot,infoPrice,check_price,backtest,GetinfoBacktest
 from datetime import datetime,timedelta
 import json
-import Function.Service.BotGrit_CheckPrice_Fast_API_FN_buy as FN_buy
+# import Function.Service.BotGrit_CheckPrice_Fast_API_FN_buy as FN_buy
+import Function.Service.BotGrit_CheckPrice_Fast_API_FN_buy1_3 as FN_buy
+
+
 from bson import ObjectId
 from fastapi.responses import JSONResponse
 
