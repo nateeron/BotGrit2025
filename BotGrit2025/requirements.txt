@@ -1,3 +1,8 @@
-uvicorn main:app --reload
-
-uvicorn FastAPI_BotGrid2025:app --host 127.0.0.1 --port 45441 --reload
+fastapi[all]
+uvicorn[standard]
+gunicorn
+flask
+line_notify
+ccxt
+requests
+threaded

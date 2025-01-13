@@ -5,11 +5,13 @@ import time
 import pprint as pprint
 import Function.Service.FN_calAction as ta
 
-from Function.MongoDatabase import db
+from Function.MongoDatabase import Config
 from Function.Models.model_routes_botGrid import oj_Order,check_price
 from Function.Service.sv_botgrid import (fn_insertOrder,update_order_status)
 import Function.Service.BotSpot as  BotSpot
 from pydantic import BaseModel
+
+
 # with open('data.json') as f:
 #     data = json.load(f)
 
@@ -76,6 +78,8 @@ class OrderManager:
         self.config = ""
         
     def check_price_buy(self,req:check_price):
+        
+        ss = 0
         global Oder_NaverBuy
         global befo_price
         global count_Buy
@@ -108,10 +112,11 @@ class OrderManager:
             befo_price.pop(0)
             befo_price.append(price)
             
-        
-        amount = 25
-        percenS = 1.5
-        percenB = 0.8
+        st = Config.getSetting()
+        db= Config.connet()
+        amount = float(st["ORDER_VAL"])
+        percenB = float(st["PERCEN_BUY"])
+        percenS = float(st["PERCEN_SELL"])
         
         qty ="{:.4f}".format(float(amount/price) )
         P_Sell = price + ((price / 100) * percenS) 
@@ -124,13 +129,16 @@ class OrderManager:
         #    print(order_last[len(order_last)-1])
         price_start = 0
         # ใน data -7 *1000
-        timestem_buy = req.timestamp
+        timestem_buy = req.timestamp 
         time_now = convert_timestamp(timestem_buy) 
         actionB = False
         #--------------------------------------------------------------
         # 002
         if len(order_last) == 0:
             price_start = req.price
+            
+            # Action Binace Buy and Get Time
+            
             order = oj_Order(
                             Order_id=1,
                             status=0,

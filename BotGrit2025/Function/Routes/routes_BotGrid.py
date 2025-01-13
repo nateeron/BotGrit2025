@@ -1,5 +1,5 @@
 from fastapi import APIRouter,HTTPException
-from Function.Models.model_routes_botGrid import req_bot,infoPrice,backtest,GetinfoBacktest
+from Function.Models.model_routes_botGrid import req_bot,infoPrice,check_price,backtest,GetinfoBacktest
 from Function.Service.sv_botgrid import (bot_start)
 import Function.Service.sv_botgrid_Backtest as bt 
 
@@ -14,6 +14,9 @@ import Function.Service.BotGrit_CheckPrice_Fast_API_FN_buy as FN_buy
 import websocket
 import asyncio
 import websockets
+import time
+
+
 r_botgrid = APIRouter()
 
 ws_thread = None
@@ -49,21 +52,40 @@ def on_close(ws):
 def on_open(ws):
     print("### opened ###")
 
-def on_message(ws, message):
-    data = json.loads(message)
-    if price1[0]["E"] != data["E"] and  price1[0]["p"] != data["p"]:
-        print(data["s"],data["p"],55)
-        print('------------start-------------')
-        symbo = data['s']
-        price = float(data['p']) 
-        print(symbo,price)
-        order_manager =FN_buy.OrderManager()  # Create an instance of OrderManager
-        resp = order_manager.check_price_buy(price,symbo)
-        # {'e': 'trade', 'E': 1722844176552, 's': 'XRPUSDT', 't': 641078642, 'p': '0.47220000', 'q': '1273.00000000', 'T': 1722844176546, 'm': False, 'M': True}
-        if price1:
-            price1.pop(0)
-        price1.append({"E":data["E"],"p":data["p"]})
+Pass_Run = True
 
+def on_message(ws, message):
+    global Pass_Run
+    
+    if Pass_Run :
+        Pass_Run = False
+        try:
+            data = json.loads(message)
+            if price1[0]["E"] != data["E"] and  price1[0]["p"] != data["p"]:
+                print(data["s"],data["p"],55)
+                print('------------start-------------')
+                symbo = data['s']
+                price = float(data['p']) 
+                T = int(data['T'])
+                print(symbo,price)
+                order_manager =FN_buy.OrderManager()  # Create an instance of OrderManager
+                req = check_price(
+                        symbol=symbo,
+                        price=price,
+                        tf="1m",
+                        timestamp=T
+                )
+                resp = order_manager.check_price_buy(req)
+                # {'e': 'trade', 'E': 1722844176552, 's': 'XRPUSDT', 't': 641078642, 'p': '0.47220000', 'q': '1273.00000000', 'T': 1722844176546, 'm': False, 'M': True}
+                if price1:
+                    price1.pop(0)
+                price1.append({"E":data["E"],"p":data["p"]})
+        except Exception as e:
+            print(f'Error on_message :{e}')
+        finally:
+            print('The try except is finished')
+            time.sleep(2)
+            Pass_Run = True
     
 def start_websocket_blocking():
     global ws
