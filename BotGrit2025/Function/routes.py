@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 # from typing import List
 from Function.MongoDatabase import collection,DB
 
-from Function.models import PriceData, PriceResponse,reqCollection_Name,req
+from Function.Models.models import PriceData, PriceResponse,reqCollection_Name,req
 # from crud import create_price, read_prices, read_price, update_price, delete_price
 
 price_router = APIRouter()

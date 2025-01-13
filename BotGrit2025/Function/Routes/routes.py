@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException
 # from typing import List
-from Function.MongoDatabase import db
+from Function.MongoDatabase import Config 
 
 from Function.Models.models import PriceData, PriceResponse,reqCollection_Name,req
 # from crud import create_price, read_prices, read_price, update_price, delete_price
 
+db= Config.connet()
 
 price_router = APIRouter()
 @price_router.get("/")

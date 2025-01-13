@@ -1,5 +1,5 @@
 
-from Function.MongoDatabase import db
+from Function.MongoDatabase import Config
 from Function.Models.model_routes_infoPrice import req_getprice,IsUpdate,DeleteRequest
 from Function.Models.model_routes_botGrid import oj_Order
 import asyncio
@@ -9,7 +9,7 @@ from datetime import datetime,timedelta
 import json
 import websocket
 
-
+db= Config.connet()
 def bot_start(req:req_bot):
     table_collection = "XRPUSDT_1m"
     if req.id == 1:

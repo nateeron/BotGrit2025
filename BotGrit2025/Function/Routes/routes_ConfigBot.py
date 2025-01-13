@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 import Function.Service.ConvertTime as cvt
 from Function.Models.model_routes_infoPrice import reqGetHistory
 import json
-
+import time
 
 r_ConfigBot = APIRouter()
 
@@ -98,7 +98,7 @@ def key():
         side_ = side_.lower()
         print(side_)
         
-@r_ConfigBot.post("/getBalance")
+@r_ConfigBot.post("/ConfigBot/getBalance")
 def getBalance():
        
         # Fetch account balances
@@ -170,6 +170,68 @@ def getBalance():
         # Add total balance and its equivalent in THB
         resp.append(f"Sum balance: {sum_balance:.2f} USDT : THB x35 = {sum_balance * 35:.2f}")
         return resp
+    
+    
+@r_ConfigBot.post("/gethistory")
+def getHistory(req:reqGetHistory):
+    # List to hold historical orders
+    order_history = []
+    print(req)
+    try:
+        # Fetch all trading symbols from the account
+        #exchange_info = client.get_exchange_info()
+        #symbols = [symbol['symbol'] for symbol in exchange_info['symbols']]
+        #symbols = ['XRPUSDT','BNBUSDT']
+        # Loop through all symbols to get their order history
+        err = ""
+        for symbol in req.symbols:
+            try:
+                # Fetch all orders for the symbol
+                orders = client.get_all_orders(symbol=symbol,limit=req.limit)
+                # Filter completed buy/sell orders
+                i = 0
+                for order in orders:
+                    if i <= 3 :
+                        i +=1
+                    if order['status'] == 'FILLED' and order['side'] in ['BUY', 'SELL']:
+                        executed_qty = float(order['executedQty'])
+                        quote_qty = float(order['cummulativeQuoteQty'])
+                        if symbol == 'XRPUSDT':
+                            price = (
+                                f'{(quote_qty / executed_qty):.4f}'
+                                if executed_qty > 0 else "0.0000"
+                            )
+                        else:
+                            price = (
+                                f'{(quote_qty / executed_qty):.2f}'
+                                if executed_qty > 0 else "0.00"
+                            )   
+                        order_info = {
+                            "symbol": symbol,
+                            "order_id": order['orderId'],
+                            "side": order['side'],  # BUY or SELL
+                            "price":price,
+                            "executed_qty": float(order['executedQty']),
+                            "quote_qty": float(order['cummulativeQuoteQty']),
+                            "time": cvt.ts_int13_to_datetime_bangkok(int(order['updateTime']) )
+                        }
+                        order_history.append(order_info)
+            except Exception as e:
+                print(f"Error fetching orders for {symbol}: {e}")
+                err = f"Error fetching orders for {symbol}: {e}"
+        # Sort orders by time (optional)
+        order_history.sort(key=lambda x: x['time'], reverse=True)
+        # Prepare a response summary
+        resp = []
+        for order in order_history:
+            resp.append(f"Symbol: {order['symbol']}, Side: {order['side']}, "
+                        f"Price: {order['price']}, Executed Quantity: {order['executed_qty']}, "
+                        f"Quote Quantity: {order['quote_qty']}, Time: {order['time']}")
+        return resp if resp else [f"No order history found. {err}"]
+    
+    except Exception as e:
+        return {"error": str(e)}
+    
 
 # Helper function to convert balances to USDT
 def get_balance_in_usdt(asset_name, free_balance):
@@ -251,10 +313,20 @@ def getHistory(req:reqGetHistory):
         #symbols = [symbol['symbol'] for symbol in exchange_info['symbols']]
         #symbols = ['XRPUSDT','BNBUSDT']
         # Loop through all symbols to get their order history
+        
+        # client_time = client.get_server_time()
+        # time_offset = client_time['serverTime'] - int(time.time() * 1000)
+        # client.timestamp_offset = time_offset
+
+        # Fetch orders with adjusted timestamp
+        print("Local time:", int(time.time() * 1000))
+        print("Server time:", client.get_server_time()['serverTime'])
+        print("Time offset:", client.timestamp_offset)
         for symbol in req.symbols:
             try:
+                
                 # Fetch all orders for the symbol
-                orders = client.get_all_orders(symbol=symbol,limit=req.limit)
+                orders = client.get_all_orders(symbol=symbol,limit=req.limit,recvWindow=10000)
                 pprint(orders[0])
                 pprint('--------------------------------------------------------')
                 # Filter completed buy/sell orders

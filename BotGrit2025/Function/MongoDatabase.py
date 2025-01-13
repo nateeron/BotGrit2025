@@ -2,10 +2,14 @@ from pymongo import MongoClient
 import json
 # MongoDB connection
 # client = MongoClient("mongodb://localhost:4500")
-client = MongoClient("mongodb://localhost:27017")
-db = client["BotGrit2025"]
+# client = MongoClient("mongodb://localhost:27017")
+# db = client["BotGrit2025"]
 
 class Config:
+    """
+    from Function.MongoDatabase import Config \n
+    db= Config.connet()
+    """
     @staticmethod
     def getSetting():
         # Open the JavaScript file
@@ -24,7 +28,6 @@ class Config:
         host = settings["Connetion"]["DATA_HOST"]
         port = settings["Connetion"]["DATA_PORT"]
         DB_Name = settings["Connetion"]["DATA_NAME"]
-        print(f"mongodb://{host}:{port}")
         client = MongoClient(f"mongodb://{host}:{port}")
         db = client[DB_Name]
         return db

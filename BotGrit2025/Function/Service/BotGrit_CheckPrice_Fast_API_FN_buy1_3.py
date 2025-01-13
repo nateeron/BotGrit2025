@@ -5,14 +5,14 @@ import time
 from pprint import pprint
 import Function.Service.FN_calAction as ta
 
-from Function.MongoDatabase import db
+from Function.MongoDatabase import Config
 from Function.Models.model_routes_botGrid import oj_Order,check_price
 from Function.Service.sv_botgrid import (fn_insertOrder,update_order_status)
 import Function.Service.BotSpot as  BotSpot
 from pydantic import BaseModel
 # with open('data.json') as f:
 #     data = json.load(f)
-
+db= Config.connet()
 # # Save the updated JSON data back to the file
 # with open('data.json', 'w') as f:
 #     json.dump(data, f, indent=4) # Save with indentation for better readability

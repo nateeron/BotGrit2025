@@ -1,6 +1,8 @@
 from bson import ObjectId
 from pymongo.collection import Collection
-from Function.MongoDatabase import db
+from Function.MongoDatabase import Config
+
+db= Config.connet()
 # Helper function to convert MongoDB document to dictionary
 def document_to_dict(doc):
     return {

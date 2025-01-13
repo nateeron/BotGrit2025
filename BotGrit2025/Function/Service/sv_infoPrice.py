@@ -1,5 +1,5 @@
 
-from Function.MongoDatabase import db
+from Function.MongoDatabase import Config
 from Function.Models.model_routes_infoPrice import req_getprice,IsUpdate,DeleteRequest
 import asyncio
 import requests
@@ -7,7 +7,7 @@ import requests
 from datetime import datetime,timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-
+db= Config.connet()
 ## TS: int10 to datetime
 ## TS: int13 to datetime
 ## TS: int10 to datetime bangkok

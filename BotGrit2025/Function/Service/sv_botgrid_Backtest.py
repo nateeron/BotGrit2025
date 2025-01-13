@@ -1,5 +1,5 @@
 
-from Function.MongoDatabase import db
+from Function.MongoDatabase import Config 
 from Function.Models.model_routes_infoPrice import req_getprice,IsUpdate,DeleteRequest
 from Function.Models.model_routes_botGrid import oj_Order
 import asyncio
@@ -13,6 +13,8 @@ import Function.Service.BotGrit_CheckPrice_Fast_API_FN_buy1_3 as FN_buy
 
 from bson import ObjectId
 from fastapi.responses import JSONResponse
+
+db= Config.connet()
 
 def convert_timestamp(timestamp:int):
     """convert
