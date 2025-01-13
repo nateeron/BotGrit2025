@@ -5,12 +5,12 @@ from Function.Service.crud import create_tables
 #from Function.Service.sv_infoPrice import create_tables
 from Function.MongoDatabase import ConnetBinace
 import ccxt
-import pprint as pprint
+from pprint import pprint
 from binance.client import Client
 from datetime import datetime, timedelta
 
-
-
+import Function.Service.ConvertTime as cvt
+from Function.Models.model_routes_infoPrice import reqGetHistory
 r_ConfigBot = APIRouter()
 
 API_KEY_C = ConnetBinace['API_KEY']
@@ -167,4 +167,65 @@ def report_Sumary():
         
         return snapshots
        
-       
+@r_ConfigBot.post("/gethistory")
+def getHistory(req:reqGetHistory):
+    # List to hold historical orders
+    order_history = []
+    print(req)
+    try:
+        # Fetch all trading symbols from the account
+        #exchange_info = client.get_exchange_info()
+        #symbols = [symbol['symbol'] for symbol in exchange_info['symbols']]
+        #symbols = ['XRPUSDT','BNBUSDT']
+        # Loop through all symbols to get their order history
+        for symbol in req.symbols:
+            try:
+                # Fetch all orders for the symbol
+                orders = client.get_all_orders(symbol=symbol,limit=req.limit)
+                pprint(orders[0])
+                pprint('--------------------------------------------------------')
+                # Filter completed buy/sell orders
+                i = 0
+                for order in orders:
+                    if i <= 3 :
+                        i +=1
+                        pprint(order)
+                        
+                    if order['status'] == 'FILLED' and order['side'] in ['BUY', 'SELL']:
+                        executed_qty = float(order['executedQty'])
+                        quote_qty = float(order['cummulativeQuoteQty'])
+                        if symbol == 'XRPUSDT':
+                            price = (
+                                f'{(quote_qty / executed_qty):.4f}'
+                                if executed_qty > 0 else "0.0000"
+                            )
+                        else:
+                            price = (
+                                f'{(quote_qty / executed_qty):.2f}'
+                                if executed_qty > 0 else "0.00"
+                            )   
+                        order_info = {
+                            "symbol": symbol,
+                            "order_id": order['orderId'],
+                            "side": order['side'],  # BUY or SELL
+                            "price":price,
+                            "executed_qty": float(order['executedQty']),
+                            "quote_qty": float(order['cummulativeQuoteQty']),
+                            "time": cvt.ts_int13_to_datetime_bangkok(int(order['updateTime']) )
+                        }
+                        order_history.append(order_info)
+            except Exception as e:
+                print(f"Error fetching orders for {symbol}: {e}")
+
+        # Sort orders by time (optional)
+        order_history.sort(key=lambda x: x['time'], reverse=True)
+        # Prepare a response summary
+        resp = []
+        for order in order_history:
+            resp.append(f"Symbol: {order['symbol']}, Side: {order['side']}, "
+                        f"Price: {order['price']}, Executed Quantity: {order['executed_qty']}, "
+                        f"Quote Quantity: {order['quote_qty']}, Time: {order['time']}")
+        return resp if resp else ["No order history found."]
+    
+    except Exception as e:
+        return {"error": str(e)}

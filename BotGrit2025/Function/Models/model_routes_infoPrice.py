@@ -25,3 +25,9 @@ class IsUpdate:
     
 class DeleteRequest(BaseModel):
     tableName: str
+    
+class reqGetHistory(BaseModel):
+    symbols: list
+    limit:int
+    
+    
