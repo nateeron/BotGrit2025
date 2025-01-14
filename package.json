@@ -1,0 +1,7 @@
+{
+  "name": "your-project-name",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "C:/Users/CayoshiMs/AppData/Local/Programs/Python/Python311/python.exe h:/Developer/Python/BotGrit2025/BotGrit2025/FastAPI_BotGrid2025V42.py"
+  }
+}
