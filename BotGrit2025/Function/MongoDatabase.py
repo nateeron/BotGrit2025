@@ -28,7 +28,13 @@ class Config:
         host = settings["Connetion"]["DATA_HOST"]
         port = settings["Connetion"]["DATA_PORT"]
         DB_Name = settings["Connetion"]["DATA_NAME"]
-        client = MongoClient(f"mongodb://{host}:{port}")
+        user = settings["Connetion"]["DATA_USER"]
+        passw = settings["Connetion"]["DATA_PASSWORD"]
+        client = None
+        if user != "" and passw != "" :
+            client = MongoClient(f"mongodb://{user}:{passw}@{host}:{port}/admin")
+        else :
+            client = MongoClient(f"mongodb://{host}:{port}")
         db = client[DB_Name]
         return db
     

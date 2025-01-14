@@ -3,7 +3,7 @@ from flask import Flask, request
 # from Service.crud import create_tables
 from Function.Service.crud import create_tables
 #from Function.Service.sv_infoPrice import create_tables
-from Function.MongoDatabase import ConnetBinace
+from Function.MongoDatabase import ConnetBinace,Config
 import ccxt
 from pprint import pprint
 from binance.client import Client
@@ -25,6 +25,37 @@ client = Client(API_KEY_C, API_SECRET)
 def run():
         create_tables()
         return {"message": "OK RUNNING ConfigBot"}
+
+@r_ConfigBot.get("/ConfigBot/CheckConfig")
+def CheckConfig():
+    try:
+        # Get the database connection details
+        db = Config.connet()
+        # Extract the database name
+        database_name = db.name
+        print(database_name)
+        # Extract the host and port details
+        client = db.client
+        host, port = None, None
+        
+        # If available, extract address details
+        if client.address:
+            host, port = client.address
+
+        # Return the connection details
+        return {
+            "connection_details": {
+                "host": host,
+                "port": port,
+                "database_name": database_name,
+                "status": "connected"
+            }
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    
+    
 
 @r_ConfigBot.post("/ConfigBot/key")
 def key():
@@ -263,43 +294,19 @@ def getdata():
     settings =[]
     with open("Setting.js", "r") as js_files:
         js_code = js_files.read()
-
         # Parse the JSON string into a Python dictionary
         data = js_code.split('=')[1]
-        settings = { "System_Setting": json.loads(data) }
-        # Add Detail
-        #oj = {"note ReOpen_Order":" ON : OFF",
-        #      "note Margin_Type":" CROSSED : ISOLATED" ,
-        #      "openlong": {"side": "openlong", "amount": "@623", "symbol": "", "passphrase": "" },
-        #      "openshort": {"side": "openshort", "amount": "@623", "symbol": "", "passphrase": "" },
-        #      "closelong": {"side": "closelong", "amount": "@623", "symbol": "", "passphrase": "" },
-        #      "closeshort": {"side": "closeshort", "amount": "@623", "symbol": "", "passphrase": "" },
-        #      }
-        #
-        #settings.update(oj)
-        
-        
+        settings = json.loads(data)
     return settings
-# data = {
-#     "API_Key" : "iA99BK1DUaY58jE3pA3boVerKzcHcytxNjjdm0ePvSGck3QVbBwHfL6HkviaHoL2",
-#     "API_SECRET" : "IJSDequryfJWk75U4gEFdgRofyFsyqdycZpOKmdYUVKstSQ6KfgJYaslYjPk353F",
-#     "LineToken" : "VLk6TnJfmJ9hRQNEhBwBDS0MGDMoUl3XsJPgba7KS2p",
-#     "PassWord" : "ec7603f9-2d8b-5826-b98d-27b7fcf2b70a" ,
-#     "ReOpen_Order" : 'ON', 
-#     "Margin_Type" : 'CROSSED',
-#     "isTEST" : 0,
-# }  
 
 @r_ConfigBot.post('/ConfigBot/update')
 async def update(req: Request):
     req_data = await req.json()
     print(req_data)
     print(type(req_data))
-    
     # Writing request data to Setting.js file
     with open("Setting.js", "w") as js_file:
-        js_file.write("var data = " + json.dumps(req_data))
-        
+        js_file.write("var data = " + json.dumps(req_data, indent=4))
     return "Success"
        
 @r_ConfigBot.post("/gethistory")
