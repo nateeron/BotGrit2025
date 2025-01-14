@@ -1,0 +1,8 @@
+fastapi[all]
+uvicorn[standard]
+gunicorn
+flask
+line_notify
+ccxt
+requests
+threaded

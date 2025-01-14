@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Test</title>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Socket.IO Test</h1>
+
+    <button onclick="sendUpdate()">Send Update</button>
+
+    <script>
+        // Create a Socket.IO connection to the FastAPI server
+        const socket = io("http://127.0.0.1:45441");
+
+        // Listen for price updates from the server
+        socket.on("price_update", function(data) {
+            console.log("Price Update: ", data);
+            alert("Price updated: " + data);
+        });
+
+        // Function to send an update to the server
+        function sendUpdate() {
+            const priceData = {
+                price: Math.random() * 100
+            };
+
+            // Send a POST request to update the price on the backend
+            fetch("http://127.0.0.1:45441/update_price/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(priceData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Price update response: ", data);
+            })
+            .catch(error => {
+                console.error("Error updating price: ", error);
+            });
+        }
+    </script>
+</body>
+</html>
