@@ -160,10 +160,8 @@ def LoadPrice_Start(req:req_getprice):
         query = {}
     
     timestamp_min = timeLoadAPI(req.datefrom) if req.datefrom != "" else 0
-  
     resp = list(db[table_collection].find().sort("timestamp", -1))
     langthData = len(resp)
-    print(langthData)
     #isdata = len(list(db[table_collection].find()))
     isdata = langthData 
     req_lengtbar_ = 10000 if req.limit == 0 else req.limit
@@ -627,94 +625,98 @@ def get_data(req:req_getprice,symbol_,lengtbar_ ,limit_,isUpdate ,starttime = 0 
         num_batches = จำนวน รอบที่ Load
     
     """ 
-    num_batches =0
-    if lengtbar_ != 0:
-        num_batches = int(lengtbar_ / limit_)
-    data_ALL = []
-    print("download.....")
-    loadTime= []
-    if lengtbar_ >0 and num_batches == 0:
-        num_batches = 1
+    try:
     
-    # หาค่า เวลา แล้วกระจาย Load
-    for _ in range(num_batches):
-        
-        if _ == 0 and starttime == 0:
-            # --------------------------------------------------
-            x = load_data(symbol_, req.tf, limit_, starttime,endtime)
-            data_ALL.extend(x)  # Use extend to add elements of x to data_ALL
-            
-            if len(x) > 0 :
-                st = StartNewTime(interval, limit_)
-                startTime = x[0][0] - st
-                loadTime.append(startTime)
-            # --------------------------------------------------
-        else:
-            """
-            limit_ = 3
-            interval = (18)
-            example [0],1,2,[3],4,5,[6],7,8,[9],10,11,[12],13,14,[15],16,17,(18 start),(on data 19,20,21,22,23,24,25)
-            loadTime = [15,12,9,6,3,0]
-            resp =  [15,16,17],
-                    [12,13,14],
-                    [9 ,10,11],
-                    [6 ,7 ,8 ],
-                    [3 ,4 ,5 ],
-                    [0 ,1 ,2 ]
-            """
-            if starttime != 0 :
-                if isUpdate == 2:
-                    loadTime.append(starttime)
-                    starttime = 0
+        num_batches =0
+        if lengtbar_ != 0:
+            num_batches = int(lengtbar_ / limit_)
+        data_ALL = []
+        print("download.....")
+        loadTime= []
+        if lengtbar_ >0 and num_batches == 0:
+            num_batches = 1
+
+        # หาค่า เวลา แล้วกระจาย Load
+        for _ in range(num_batches):
+
+            if _ == 0 and starttime == 0:
+                # --------------------------------------------------
+                x = load_data(symbol_, req.tf, limit_, starttime,endtime)
+                data_ALL.extend(x)  # Use extend to add elements of x to data_ALL
+
+                if len(x) > 0 :
+                    st = StartNewTime(interval, limit_)
+                    startTime = x[0][0] - st
+                    loadTime.append(startTime)
+                # --------------------------------------------------
+            else:
+                """
+                limit_ = 3
+                interval = (18)
+                example [0],1,2,[3],4,5,[6],7,8,[9],10,11,[12],13,14,[15],16,17,(18 start),(on data 19,20,21,22,23,24,25)
+                loadTime = [15,12,9,6,3,0]
+                resp =  [15,16,17],
+                        [12,13,14],
+                        [9 ,10,11],
+                        [6 ,7 ,8 ],
+                        [3 ,4 ,5 ],
+                        [0 ,1 ,2 ]
+                """
+                if starttime != 0 :
+                    if isUpdate == 2:
+                        loadTime.append(starttime)
+                        starttime = 0
+                    else:
+                        st = StartNewTime(interval, limit_)
+                        if len(str(starttime)) < 13:
+                            starttime = starttime *1000
+                        loadTime.append(starttime- st)
+                        #print(loadTime[0],CaldateTime(loadTime[0]/1000))
+                        starttime = 0
                 else:
                     st = StartNewTime(interval, limit_)
-                    if len(str(starttime)) < 13:
-                        starttime = starttime *1000
-                    loadTime.append(starttime- st)
-                    #print(loadTime[0],CaldateTime(loadTime[0]/1000))
-                    starttime = 0
-            else:
-                st = StartNewTime(interval, limit_)
-                startTime = loadTime[len(loadTime)-1] - st
-                loadTime.append(startTime)
+                    startTime = loadTime[len(loadTime)-1] - st
+                    loadTime.append(startTime)
 
-    # print(loadTime)
+        # print(loadTime)
 
-    # Create Task Get API Multi Task max_workers:20 
+        # Create Task Get API Multi Task max_workers:20 
+
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            future_to_time = {executor.submit(load_data, symbol_, interval, limit_, time,endtime): time for time in loadTime}
+            for future in as_completed(future_to_time):
+                time = future_to_time[future]
+                try:
+                    data = future.result()
+                    data_ALL.extend(data)
+                except Exception as e:
+                    print(f"Request failed for time {time}: {e}")
     
-    with ThreadPoolExecutor(max_workers=20) as executor:
-        future_to_time = {executor.submit(load_data, symbol_, interval, limit_, time,endtime): time for time in loadTime}
-        for future in as_completed(future_to_time):
-            time = future_to_time[future]
-            try:
-                data = future.result()
-                data_ALL.extend(data)
-            except Exception as e:
-                print(f"Request failed for time {time}: {e}")
-    
-    #print(CaldateTime(time))
-    
-    # for item in data_ALL:
-    #     print(CaldateTime(item[0]))
-    resp = SortData(data_ALL)
-    table_collection = req.symbol+'_'+req.tf 
-    t = 7*60*60*1000
-    print("Number Data:",len(resp))
-    print("download Success...")
-    print("----------------------------------------------------")
-    #for item in resp:
-    #    print(convert_timestamp(item[0]+t))
-    print("----------------------------------------------------")
-    if isUpdate != 4:
-        if len(resp) > 0:
-            insert(table_collection,resp)
-    return resp
+        #print(CaldateTime(time))
+
+        # for item in data_ALL:
+        #     print(CaldateTime(item[0]))
+        resp = SortData(data_ALL)
+        table_collection = req.symbol+'_'+req.tf 
+        t = 7*60*60*1000
+        print("Number Data:",len(resp))
+        print("download Success...")
+        print("----------------------------------------------------")
+        #for item in resp:
+        #    print(convert_timestamp(item[0]+t)) 
+        print("----------------------------------------------------")
+        if isUpdate != 4:
+            if len(resp) > 0:
+                insert(table_collection,resp)
+        return resp
+    except Exception as e:
+        print(f"Error Function\Service\sv_infoPrice.py get_data {e}")
     
 def deleteData(tableName : str):
     try:
         # Check if the collection exists
         if tableName in db.list_collection_names():
-            db[tableName].drop()  # Drop the collection
+            db[tableName].drop()  # Drop the collection 
             return {"status": 200, "message": f"Collection '{tableName}' deleted successfully."}
         else:
             return {"status": 404, "message": f"Collection '{tableName}' not found."}

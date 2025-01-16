@@ -7,7 +7,6 @@ import Function.Service.FN_calAction as ta
 
 from Function.MongoDatabase import Config
 from Function.Models.model_routes_botGrid import oj_Order,check_price
-from Function.Service.sv_botgrid import (fn_insertOrder,update_order_status)
 import Function.Service.BotSpot as  BotSpot
 from pydantic import BaseModel
 # with open('data.json') as f:
@@ -71,8 +70,8 @@ class OrderManager:
         self.max_Order = 0
         
         # Load configuration
-        with open('config.json') as f:
-            self.config = json.load(f)
+        #with open('config.json') as f:
+        #    self.config = json.load(f)
             
             
     def action_buy(self, order):
@@ -85,17 +84,18 @@ class OrderManager:
         """
         For BackTEST Fast"""
         
-        for ind,x in enumerate(data):
+        for ind,oj in enumerate(data):
             
             if ind % 100000 == 0:
                 print("Count:",ind,"Data Langth:",len(self.data_New))
-                
-            price = x['close']
-            #print(x)
-            time_action = x['timestamp']
+           
+            price = oj['close']
+            #print(oj) 
+            time_action = oj['timestamp']
             req = check_price(
                     symbol='XRPUSDT',
                     price=price,
+                    close=price,
                     tf="1m",
                     timestamp=time_action
             )
@@ -111,9 +111,11 @@ class OrderManager:
                 self.befo_price.append(price)
 
 
-            amount = 25
-            percenS = 1.5
-            percenB = 0.8
+            st = Config.getSetting()
+            db= Config.connet()
+            amount = float(st["ORDER_VAL"])
+            percenB = float(st["PERCEN_BUY"])
+            percenS = float(st["PERCEN_SELL"])
 
             qty ="{:.4f}".format(float(amount/price) )
             P_Sell = price + ((price / 100) * percenS) 

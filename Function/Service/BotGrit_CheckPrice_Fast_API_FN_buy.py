@@ -32,7 +32,7 @@ from pydantic import BaseModel
 # for order in filtered_orders:
 #     print(order)
 ISDOING_ACTION = 0
-
+db= Config.connet()
 from bson import ObjectId
 
 class MongoEncoder(json.JSONEncoder):

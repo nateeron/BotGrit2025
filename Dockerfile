@@ -1,17 +1,18 @@
-# Use an official Python runtime as a parent image
+# Use a slim Python base image
 FROM python:3.11-slim
 
-# Set the working directory in the container
+# Set working directory
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
+# Copy and install dependencies first (optimize layer caching)sss
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --default-timeout=600 -r requirements.txt
+
+# Copy the rest of the app
 COPY . .
 
-# Install any needed dependencies
-RUN pip install -r requirements.txt
+# Expose the required port
+EXPOSE 45441
 
-# Make port 8000 available to the world outside this container
-EXPOSE 8000
-
-# Run uvicorn to serve the FastAPI app
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the app
+CMD ["uvicorn", "FastAPI_BotGrid2025:app", "--host", "0.0.0.0", "--port", "45441"]

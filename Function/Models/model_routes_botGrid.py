@@ -17,6 +17,7 @@ class req_bot(BaseModel):
 class check_price(BaseModel):
     symbol:str
     price:float
+    close:float
     tf:str
     timestamp:int
     

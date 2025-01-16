@@ -10,16 +10,6 @@ import json
 import websocket
 
 db= Config.connet()
-def bot_start(req:req_bot):
-    table_collection = "XRPUSDT_1m"
-    if req.id == 1:
-        
-        resp = list(db[table_collection].find().sort("timestamp", -1))    
-        print("Data :",len(resp))
-    else:
-        pass
-    
-    return "start"
 
     
 def fn_insertOrder(req:oj_Order ):

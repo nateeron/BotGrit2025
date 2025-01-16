@@ -2,8 +2,7 @@ from pymongo import MongoClient
 import json
 # MongoDB connection
 # client = MongoClient("mongodb://localhost:4500")
-# client = MongoClient("mongodb://localhost:27017")
-# db = client["BotGrit2025"]
+
 
 class Config:
     """
@@ -37,7 +36,8 @@ class Config:
             client = MongoClient(f"mongodb://{host}:{port}")
         db = client[DB_Name]
         return db
-    
+
+       
 # try:
 #     db = Config.connet()
 #     print("Successfully connected to the database.")

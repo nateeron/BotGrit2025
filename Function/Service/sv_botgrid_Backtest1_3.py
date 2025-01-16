@@ -7,15 +7,12 @@ import requests
 from Function.Models.model_routes_botGrid import req_bot,infoPrice,check_price,backtest,GetinfoBacktest
 from datetime import datetime,timedelta
 import json
-# import Function.Service.BotGrit_CheckPrice_Fast_API_FN_buy as FN_buy
 import Function.Service.BotGrit_CheckPrice_Fast_API_FN_buy1_3 as FN_buy
-
-
 from bson import ObjectId
 from fastapi.responses import JSONResponse
+import time
 
 db= Config.connet()
-
 def convert_timestamp(timestamp:int):
     """convert
 
@@ -49,64 +46,44 @@ def Backtest_start(req:backtest):
     DateTo:int
     """
     try:
-      
-    
         table_collection = "XRPUSDT_1m"
+        start_time = time.time()
         data = None
         #data = list(db[table_collection].find().sort("timestamp", 1).limit(10))  
         if req.limit == 0:
             data = list(db[table_collection].find().sort("timestamp", -1))   
         else:
             data = list(db[table_collection].find().sort("timestamp", -1).limit(req.limit))   
-
-        data2 = list(db[table_collection].find().sort("timestamp", -1))    
-        # print("Data :",len(data))
-        # print(data)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        start_time = end_time
+        print(f" 1 Process took {elapsed_time:.4f} seconds")
+    
         symbo = req.symbol
         nameTime = datetime.now().strftime('%Y_%m_%d_%H.%M.%S')
-        # froms = data[0]
-        # DATAtO = data[len(data)-1]
-        # print(len(data))
-        # print(froms)
-        # print(DATAtO)
-        # print('--------------------')
-        # print(len(data2))
-        # print(data2[0])
-        # print( data2[len(data2)-1])
+    
         data.reverse()
-        #for ind,x in enumerate(data):
-        #   time_action = x['timestamp']
-        #   time_action = x['timestamp']
-        #   s = convert_timestamp(time_action)
-        #   p ="{:.4f}".format(float(x['close']))
-        #   print(ind+1,s,p)
+    
         table_collections = "OrderBuy"#+nameTime
         # Clear Data
         db[table_collections].delete_many({})
-
-        for x in data:
-            price = x['close']
-            #print(x)
-            time_action = x['timestamp']
-            order_manager = FN_buy.OrderManager()  # Create an instance of OrderManager
-            req = check_price(
-                    symbol=symbo,
-                    price=price,
-                    close=price,
-                    tf="1m",
-                    timestamp=time_action
-            )
-            resp = order_manager.check_price_buy(req)
-
-            # print("sv_botgrid_Backtest.py :",resp)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        start_time = end_time
+        print(f" 2 Process took {elapsed_time:.4f} seconds")
+        order_manager = FN_buy.OrderManager()  # Create an instance of OrderManager
+        print("len >> ",len(data))
+        resp = order_manager.check_price_buy(data)
+        #print("sv_botgrid_Backtest.py :",resp)
             #print("Success ........ok")
-        datas = list(db[table_collections].find().sort("timestamp", -1))    
-        resp_converted = convert_objectid(datas)
-        resps = JSONResponse(content=resp_converted)
-        return resps
+        # datas = list(db[table_collections].find().sort("timestamp", -1))    
+        # resp_converted = convert_objectid(datas)
+        # resps = JSONResponse(content=resp_converted)
+        return []
     except Exception as e:
-        print("Error Function\Service\sv_botgrid_Backtest.py -def Backtest_start() :",e)
+        print("Error Function\Service\sv_botgrid_Backtest1_3.py -def Backtest_start() :",e)
         return JSONResponse(content={"error": str(e)})
+
 
 def data_Backtest(req:GetinfoBacktest):
     print(req)

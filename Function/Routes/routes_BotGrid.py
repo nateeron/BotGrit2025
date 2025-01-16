@@ -1,7 +1,6 @@
 from fastapi import APIRouter,HTTPException
 from Function.Models.model_routes_botGrid import req_bot,infoPrice,check_price,backtest,GetinfoBacktest
-from Function.Service.sv_botgrid import (bot_start)
-import Function.Service.sv_botgrid_Backtest as bt 
+import Function.Service.sv_botgrid_Backtest1_3 as bt 
 
 
 import json
@@ -35,11 +34,6 @@ def run():
     return {"message": "OK RUNNING Botgrid"}
 
 
-@r_botgrid.post("/botgrid/start")
-def start(req:req_bot):
-    
-    req = bot_start(req)
-    return {"message":req}
 
 
 def on_error(ws, error):

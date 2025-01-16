@@ -1,16 +1,13 @@
-
 from logging import exception
 import time
 import ccxt
 import json
-from line_notify import LineNotify
 
-from googletrans import Translator
 import pprint as pprint
 
 from binance.client import Client
 import cryptocode
-translator = Translator()
+
 
 def price_sl(entry, price):
     '''
@@ -72,7 +69,7 @@ def trad(symbol_in,side_,amount_in,joint_limit,joinlimit_tp,joinlimit_sl):
         dataconfig = json.load(f)
     ConnetBinace = dataconfig["ConnetBinace"]
     
-    notify = LineNotify(ConnetBinace['LINE_ADMIN'])
+    notify = None#LineNotify(ConnetBinace['LINE_ADMIN'])
     
     API_KEY_C = ConnetBinace['API_KEY']
     API_SECRET = ConnetBinace['API_SECRET']
@@ -408,7 +405,7 @@ def cancelOrder(orderId,symbol,all):
         dataconfig = json.load(f)
     ConnetBinace = dataconfig["ConnetBinace"]
     
-    notify = LineNotify(ConnetBinace['LINE_ADMIN'])
+    notify =None# LineNotify(ConnetBinace['LINE_ADMIN'])
     
     API_KEY_C = ConnetBinace['API_KEY']
     API_SECRET = ConnetBinace['API_SECRET']
@@ -440,7 +437,7 @@ def Create_LimitOrder(amount,Limitp):
         dataconfig = json.load(f)
     ConnetBinace = dataconfig["ConnetBinace"]
     
-    notify = LineNotify(ConnetBinace['LINE_ADMIN'])
+    notify =None# LineNotify(ConnetBinace['LINE_ADMIN'])
     
     API_KEY_C = ConnetBinace['API_KEY']
     API_SECRET = ConnetBinace['API_SECRET']
@@ -475,7 +472,7 @@ def get_open_limit_sell_orders(symbol):
         dataconfig = json.load(f)
     ConnetBinace = dataconfig["ConnetBinace"]
     
-    notify = LineNotify(ConnetBinace['LINE_ADMIN'])
+    notify = None # LineNotify(ConnetBinace['LINE_ADMIN'])
     
     API_KEY_C = ConnetBinace['API_KEY']
     API_SECRET = ConnetBinace['API_SECRET']

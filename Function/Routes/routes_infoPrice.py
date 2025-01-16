@@ -62,14 +62,16 @@ def getprice(req: req_getprice):
             "ohlc":"ohlc"
         }
         """
-        resp= []
-        resp = LoadPrice_Start(req)
-        print(type(resp))
-        resp_converted = convert_objectid(resp)
-        resps = JSONResponse(content=resp_converted)
+        try:
         
-        return resps
-    
+            resp= []
+            resp = LoadPrice_Start(req)
+            print(type(resp))
+            resp_converted = convert_objectid(resp)
+            resps = JSONResponse(content=resp_converted)
+            return resps
+        except Exception as e:
+            print(f'Error infoPrice/getprice_start getprice : {e}')
 @r_infoPrice.post("/infoPrice/Load_bar_lazy")
 def Loadbarlazy(req: req_getprice):
         """
