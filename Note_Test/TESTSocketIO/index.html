@@ -1,26 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Socket.IO Test</title>
     <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
 </head>
+
 <body>
     <h1>Socket.IO Test</h1>
-
+    <div id="Action">Waiting for updates...</div>
     <button onclick="sendUpdate()">Send Update</button>
 
     <script>
-        // Create a Socket.IO connection to the FastAPI server
-        const socket = io("http://127.0.0.1:45441");
 
-        // Listen for price updates from the server
-        socket.on("price_update", function(data) {
-            console.log("Price Update: ", data);
-            alert("Price updated: " + data);
-        });
+        // ใช้ได้ผ่านแล้ว
+        function testSSE() {
+            const url = "http://127.0.0.1:45441/events";
+            const actionDiv = document.getElementById("Action"); // Get the div element
 
+            // Create an EventSource object to connect to the SSE endpoint
+            const eventSource = new EventSource(url);
+
+            // Listen for messages from the server
+            eventSource.onmessage = (event) => {
+                console.log("Received message:", event.data);
+                actionDiv.textContent = event.data; // Set the text content of the div
+            };
+
+            // Handle connection open event
+            eventSource.onopen = () => {
+                console.log("Connection to SSE opened.");
+                actionDiv.textContent = "Connected to server...";
+            };
+
+            // Handle connection error event
+            eventSource.onerror = (error) => {
+                console.error("Error with SSE connection:", error);
+                actionDiv.textContent = "Error: Connection lost.";
+                eventSource.close(); // Optionally close the connection
+            };
+        }
+
+        // Call the function to start listening to SSE
+        testSSE();
         // Function to send an update to the server
         function sendUpdate() {
             const priceData = {
@@ -35,14 +59,15 @@
                 },
                 body: JSON.stringify(priceData)
             })
-            .then(response => response.json())
-            .then(data => {
-                console.log("Price update response: ", data);
-            })
-            .catch(error => {
-                console.error("Error updating price: ", error);
-            });
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Price update response: ", data);
+                })
+                .catch(error => {
+                    console.error("Error updating price: ", error);
+                });
         }
     </script>
 </body>
+
 </html>

@@ -117,7 +117,7 @@ class OrderManager:
         amount = float(st["ORDER_VAL"])
         percenB = float(st["PERCEN_BUY"])
         percenS = float(st["PERCEN_SELL"])
-        
+        print(f"amount {amount} PERCEN_BUY {percenB} PERCEN_SELL {percenS}")
         qty ="{:.4f}".format(float(amount/price) )
         P_Sell = price + ((price / 100) * percenS) 
         #--------------------------------------------------------------
