@@ -36,6 +36,18 @@ def convert_objectid(obj):
         return {k: convert_objectid(v) for k, v in obj.items()}  # Recurse for dictionaries
     elif isinstance(obj, list):
         return [convert_objectid(i) for i in obj]  # Recurse for lists
+    return obj
+
+def convert_datetime(obj):
+    """Convert datetime objects to ISO format strings for JSON serialization"""
+    if isinstance(obj, datetime):
+        return obj.isoformat()  # Convert datetime to ISO format string
+    elif isinstance(obj, ObjectId):
+        return str(obj)  # Convert ObjectId to string
+    elif isinstance(obj, dict):
+        return {k: convert_datetime(v) for k, v in obj.items()}  # Recurse for dictionaries
+    elif isinstance(obj, list):
+        return [convert_datetime(i) for i in obj]  # Recurse for lists
     return obj 
 def Backtest_start(req:backtest):
     """ 
@@ -90,6 +102,7 @@ def data_Backtest(req:GetinfoBacktest):
     table_collections = "OrderBuy"
     #datas = list(db[table_collections].find({"timestem_buy":{"$lte":req.DateFrom}}).sort("timestem_buy",1))    
     datas = list(db[table_collections].find().sort("timestem_buy",1))    
-    resp_converted = convert_objectid(datas)
+    # Convert both ObjectId and datetime objects to JSON-serializable formats
+    resp_converted = convert_datetime(datas)
     resps = JSONResponse(content=resp_converted)
     return resps

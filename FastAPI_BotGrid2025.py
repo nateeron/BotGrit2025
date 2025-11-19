@@ -10,11 +10,6 @@ from Function.Routes.routes import price_router
 from Function.Routes.routes_ConfigBot import r_ConfigBot
 from Function.Routes.routes_infoPrice import r_infoPrice
 from Function.Routes.routes_BotGrid import r_botgrid
-import websocket
-import json
-from threading import Thread
-
-from websocket import WebSocketApp
 # Initialize the FastAPI app
 app = FastAPI()
 
@@ -62,4 +57,5 @@ async def update_price(price_data: PriceData):
 if __name__ == "__main__":
     #asyncio.run(main())
     import uvicorn
+    print("http://localhost:45441")
     uvicorn.run("FastAPI_BotGrid2025:app",host="0.0.0.0",  port=45441, reload=1)

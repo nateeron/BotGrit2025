@@ -6,8 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lightweight Charts with Binance WebSocket Data</title>
     <script
-        src="https://cdn.jsdelivr.net/npm/lightweight-charts@3.6.0/dist/lightweight-charts.standalone.production.js"></script>
-    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+        src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 
 </head>
 
@@ -55,6 +54,27 @@
 
     <div class="custom-tooltip" id="custom-tooltip"></div>
     <script>
+        // Global variables
+        const symbo = 'XRPUSDT'
+        const TimeFream = '1m'
+        
+        // Wait for DOM and library to load
+        window.addEventListener('DOMContentLoaded', function() {
+            // Wait a bit more to ensure library is loaded
+            setTimeout(initChart, 100);
+        });
+
+        function initChart() {
+            // Check if LightweightCharts is available
+            if (typeof LightweightCharts === 'undefined') {
+                console.error('LightweightCharts is not defined. Please check if the script is loaded correctly.');
+                const container = document.getElementById('chart1');
+                if (container) {
+                    container.innerHTML = '<p style="color: red; padding: 20px;">Error: LightweightCharts library failed to load. Please check your internet connection and try again.</p>';
+                }
+                return;
+            }
+
         const myPriceFormatter = p => p.toFixed(4);
         //----------------------------------------------------------
         //const currentLocale = window.navigator.languages[0];
@@ -64,8 +84,6 @@
         //    currency: 'EUR', // Currency for data points
         //}).format;
         //----------------------------------------------------------
-        const symbo = 'XRPUSDT'
-        const TimeFream = '1m'
         //**************************************************************************************
         // [Chart Options]
         //**************************************************************************************
@@ -918,6 +936,7 @@
 
         container.appendChild(buttonsContainer);
 
+        } // End of initChart function
     </script>
 
 
