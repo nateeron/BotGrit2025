@@ -27,6 +27,7 @@ import {
   fetchBacktestTrades,
   fetchChartBootstrap,
   fetchChartWindow,
+  getPriceLevels,
   subscribeBinanceKlines,
   type BacktestTrade,
   type OhlcPoint,
@@ -41,14 +42,18 @@ import {
 
 type MainSeries = ISeriesApi<'Candlestick'> | ISeriesApi<'Area'>
 
-const FALLBACK_VOLUME_MULTIPLIER = 120
-
 const sanitizeSeries = (points: OhlcPoint[]) => {
   const sorted = [...points].sort((a, b) => Number(a.time) - Number(b.time))
   return sorted.filter(
     (point, index) => index === 0 || point.time !== sorted[index - 1].time,
   )
 }
+
+const FALLBACK_VOLUME_MULTIPLIER = 120
+
+type PriceLineInstance =
+  | ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>
+  | ReturnType<ISeriesApi<'Area'>['createPriceLine']>
 
 const createIndicatorSeries = (
   chart: IChartApi,
@@ -196,9 +201,12 @@ export const PriceChart = () => {
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
+  const rsiChartRef = useRef<IChartApi | null>(null)
   const mainSeriesRef = useRef<MainSeries | null>(null)
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const indicatorSeriesRef = useRef<Record<string, ISeriesApi<'Line'>[]>>({})
+  const rsiSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
+  const priceLineRefs = useRef<Record<string, PriceLineInstance>>({})
   const realtimeCleanupRef = useRef<() => void>(() => {})
   const dataRef = useRef<OhlcPoint[]>([])
   const startTimestampRef = useRef<UTCTimestamp | null>(null)
@@ -209,6 +217,8 @@ export const PriceChart = () => {
   const loadIndicatorConfigs = useTradingStore(
     (state) => state.loadIndicatorConfigs,
   )
+  const priceLevels = useTradingStore((state) => state.priceLevels)
+  const setPriceLevels = useTradingStore((state) => state.setPriceLevels)
 
   const [data, setData] = useState<OhlcPoint[]>([])
   const [markers, setMarkers] = useState<SeriesMarker<UTCTimestamp>[]>([])
@@ -218,6 +228,18 @@ export const PriceChart = () => {
   useEffect(() => {
     loadIndicatorConfigs()
   }, [loadIndicatorConfigs])
+
+  useEffect(() => {
+    let active = true
+    const loadLevels = async () => {
+      const levels = await getPriceLevels(selectedCoin)
+      if (active) setPriceLevels(levels)
+    }
+    loadLevels()
+    return () => {
+      active = false
+    }
+  }, [selectedCoin, setPriceLevels])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -259,6 +281,42 @@ export const PriceChart = () => {
       realtimeCleanupRef.current?.()
       chartRef.current?.remove()
       chartRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const rsiContainer = document.getElementById('tv_rsi_container')
+    if (!rsiContainer) return
+    rsiChartRef.current = createChart(rsiContainer, {
+      height: 160,
+      layout: {
+        background: { color: 'transparent' },
+        textColor: '#e4e7ef',
+      },
+      grid: {
+        vertLines: { color: 'rgba(255,255,255,0.04)' },
+        horzLines: { color: 'rgba(255,255,255,0.04)' },
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(255,255,255,0.08)',
+        autoScale: true,
+      },
+      timeScale: {
+        borderColor: 'rgba(255,255,255,0.08)',
+      },
+    })
+    const handleResize = () => {
+      if (!rsiContainer || !rsiChartRef.current) return
+      const { width } = rsiContainer.getBoundingClientRect()
+      rsiChartRef.current.applyOptions({ width })
+    }
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      rsiChartRef.current?.remove()
+      rsiChartRef.current = null
+      rsiSeriesRef.current = null
     }
   }, [])
 
@@ -410,7 +468,20 @@ export const PriceChart = () => {
     const chart = chartRef.current
     const normalized = sanitizeSeries(data)
 
+    const clearPriceLines = () => {
+      if (!mainSeriesRef.current) return
+      Object.values(priceLineRefs.current).forEach((line) => {
+        try {
+          mainSeriesRef.current?.removePriceLine(line)
+        } catch {
+          /* noop */
+        }
+      })
+      priceLineRefs.current = {}
+    }
+
     if (mainSeriesRef.current) {
+      clearPriceLines()
       chart.removeSeries(mainSeriesRef.current)
       mainSeriesRef.current = null
     }
@@ -492,7 +563,51 @@ export const PriceChart = () => {
     }
 
     chart.timeScale().fitContent()
+
+    if (rsiChartRef.current) {
+      if (!rsiSeriesRef.current) {
+        rsiSeriesRef.current = rsiChartRef.current.addSeries(LineSeries, {
+          color: '#29b6f6',
+          lineWidth: 2,
+        }) as ISeriesApi<'Line'>
+      }
+      const rsiData = calculateRSI(normalized, 14)
+      rsiSeriesRef.current.setData(rsiData)
+      rsiChartRef.current.timeScale().fitContent()
+    }
   }, [chartMode, data, indicatorConfigs, markers, showIndicators, showVolume])
+
+  useEffect(() => {
+    const series = mainSeriesRef.current
+    if (!series) return
+    const existing = new Set(Object.keys(priceLineRefs.current))
+    priceLevels.forEach((level) => {
+      if (priceLineRefs.current[level.id]) {
+        existing.delete(level.id)
+        return
+      }
+      const line = series.createPriceLine({
+        price: level.price,
+        color: level.side === 'Buy' ? '#26a69a' : '#ef5350',
+        lineStyle: LineStyle.Dashed,
+        lineWidth: 1,
+        axisLabelVisible: true,
+        title: level.label ?? level.side,
+      })
+      priceLineRefs.current[level.id] = line
+    })
+    existing.forEach((id) => {
+      const line = priceLineRefs.current[id]
+      if (line) {
+        try {
+          series.removePriceLine(line)
+        } catch {
+          /* noop */
+        }
+        delete priceLineRefs.current[id]
+      }
+    })
+  }, [priceLevels])
 
   useEffect(() => {
     if (!markersPluginRef.current) return
@@ -511,90 +626,109 @@ export const PriceChart = () => {
   const shouldShowPlaceholder = !loading && data.length === 0
 
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        flexGrow: 1,
-        minHeight: fullscreenChart ? 520 : 380,
-        borderRadius: 3,
-        overflow: 'hidden',
-        backgroundColor: 'rgba(255,255,255,0.02)',
-      }}
-    >
-      {loading && (
-        <Box
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2,
-            backdropFilter: 'blur(2px)',
-          }}
-        >
-          <CircularProgress />
-        </Box>
-      )}
-      {error && !loading && (
-        <Box
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            px: 3,
-            zIndex: 2,
-          }}
-        >
-          <Alert severity="error" variant="filled">
-            {error}
-          </Alert>
-        </Box>
-      )}
-      {shouldShowPlaceholder && !error && (
-        <Box
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'text.secondary',
-            zIndex: 1,
-          }}
-        >
-          <Typography variant="body2">
-            ไม่พบข้อมูลสำหรับ {symbolPair} / {interval}
-          </Typography>
-        </Box>
-      )}
-      <Box
-        ref={containerRef}
-        sx={{
-          width: '100%',
-          height: '100%',
-        }}
-      />
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Box
         sx={{
-          position: 'absolute',
-          top: 16,
-          left: 16,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 0.5,
-          pointerEvents: 'none',
+          position: 'relative',
+          flexGrow: 1,
+          minHeight: fullscreenChart ? 520 : 380,
+          borderRadius: 3,
+          overflow: 'hidden',
+          backgroundColor: 'rgba(255,255,255,0.02)',
         }}
       >
-        <Typography variant="h6">
-          {selectedCoin}/USDT · {interval.toUpperCase()}
+        {loading && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2,
+              backdropFilter: 'blur(2px)',
+            }}
+          >
+            <CircularProgress />
+          </Box>
+        )}
+        {error && !loading && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              px: 3,
+              zIndex: 2,
+            }}
+          >
+            <Alert severity="error" variant="filled">
+              {error}
+            </Alert>
+          </Box>
+        )}
+        {shouldShowPlaceholder && !error && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'text.secondary',
+              zIndex: 1,
+            }}
+          >
+            <Typography variant="body2">
+              ไม่พบข้อมูลสำหรับ {symbolPair} / {interval}
+            </Typography>
+          </Box>
+        )}
+        <Box
+          ref={containerRef}
+          sx={{
+            width: '100%',
+            height: '100%',
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 16,
+            left: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.5,
+            pointerEvents: 'none',
+          }}
+        >
+          <Typography variant="h6">
+            {selectedCoin}/USDT · {interval.toUpperCase()}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {chartMode === 'candle' ? 'Candlestick' : 'Line'} Mode
+            {showIndicators ? ' · Custom indicators' : ''}{' '}
+            {showVolume ? ' · Volume' : ''}
+          </Typography>
+        </Box>
+      </Box>
+      <Box
+        sx={{
+          borderRadius: 3,
+          backgroundColor: 'rgba(255,255,255,0.02)',
+          p: 1,
+          minHeight: 160,
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+          RSI (14)
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {chartMode === 'candle' ? 'Candlestick' : 'Line'} Mode
-          {showIndicators ? ' · MA(20/90)' : ''} {showVolume ? ' · Volume' : ''}
-        </Typography>
+        <Box
+          id="tv_rsi_container"
+          sx={{ width: '100%', height: 140 }}
+        />
       </Box>
     </Box>
   )

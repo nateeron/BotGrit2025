@@ -9,12 +9,14 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputAdornment,
   InputLabel,
   MenuItem,
   Select,
   Stack,
+  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -63,6 +65,57 @@ const defaultColorMap: Record<IndicatorType, string> = {
   bollinger: '#ab47bc',
   rsi: '#29b6f6',
 }
+
+const indicatorPresets: Array<{
+  id: string
+  label: string
+  config: IndicatorConfig
+}> = [
+  {
+    id: 'preset-sma-20',
+    label: 'SMA (20)',
+    config: {
+      id: 'preset-sma-20',
+      name: 'SMA (20)',
+      type: 'sma',
+      color: defaultColorMap.sma,
+      params: { period: 20 },
+    },
+  },
+  {
+    id: 'preset-ema-20',
+    label: 'EMA (20)',
+    config: {
+      id: 'preset-ema-20',
+      name: 'EMA (20)',
+      type: 'ema',
+      color: defaultColorMap.ema,
+      params: { period: 20 },
+    },
+  },
+  {
+    id: 'preset-bbands-20',
+    label: 'Bollinger Bands (20,2σ)',
+    config: {
+      id: 'preset-bbands-20',
+      name: 'Bollinger Bands (20,2σ)',
+      type: 'bollinger',
+      color: defaultColorMap.bollinger,
+      params: { period: 20, stdDev: 2 },
+    },
+  },
+  {
+    id: 'preset-rsi-14',
+    label: 'RSI (14)',
+    config: {
+      id: 'preset-rsi-14',
+      name: 'RSI (14)',
+      type: 'rsi',
+      color: defaultColorMap.rsi,
+      params: { period: 14 },
+    },
+  },
+]
 
 const IndicatorDialog = ({
   open,
@@ -238,6 +291,19 @@ export const IndicatorManager = () => {
     )
   }, [indicatorConfigs])
 
+  const handlePresetToggle = (
+    preset: (typeof indicatorPresets)[number],
+    enabled: boolean,
+  ) => {
+    const exists = indicatorConfigs.some((config) => config.id === preset.id)
+    if (enabled && !exists) {
+      addIndicatorConfig(preset.config)
+    }
+    if (!enabled && exists) {
+      removeIndicatorConfig(preset.id)
+    }
+  }
+
   return (
     <>
       <Card sx={{ p: 0, borderRadius: 2 }}>
@@ -254,6 +320,33 @@ export const IndicatorManager = () => {
             >
               Add Indicator
             </Button>
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Quick presets
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" spacing={2} useFlexGap>
+              {indicatorPresets.map((preset) => {
+                const active = indicatorConfigs.some(
+                  (config) => config.id === preset.id,
+                )
+                return (
+                  <FormControlLabel
+                    key={preset.id}
+                    control={
+                      <Switch
+                        size="small"
+                        checked={active}
+                        onChange={(event) =>
+                          handlePresetToggle(preset, event.target.checked)
+                        }
+                      />
+                    }
+                    label={preset.label}
+                  />
+                )
+              })}
+            </Stack>
           </Box>
           {displayConfigs.length === 0 && (
             <Typography variant="body2" color="text.secondary">

@@ -36,6 +36,13 @@ export interface ReportSummary {
   winRate: number
 }
 
+export interface PriceLevel {
+  id: string
+  price: number
+  side: 'Buy' | 'Sell'
+  label?: string
+}
+
 const mockCoins: CoinSummary[] = [
   { symbol: 'BTC', name: 'Bitcoin', price: 97250, changePct: 2.4 },
   { symbol: 'ETH', name: 'Ethereum', price: 3550, changePct: -1.1 },
@@ -129,6 +136,29 @@ export const pingMockApi = async () => {
   } catch {
     // ignore network errors for mock
   }
+}
+
+export const getPriceLevels = async (
+  symbol: string,
+  count = 220,
+): Promise<PriceLevel[]> => {
+  await delay()
+  const base =
+    mockCoins.find((coin) => coin.symbol === symbol) ??
+    mockCoins[Math.floor(Math.random() * mockCoins.length)]
+  const basePrice = base.price
+  return Array.from({ length: count }).map((_, idx) => {
+    const offset = idx - Math.floor(count / 2)
+    const variance = (Math.random() - 0.5) * basePrice * 0.01
+    const price = Number((basePrice + offset * 25 + variance).toFixed(2))
+    const side = idx % 2 === 0 ? 'Buy' : 'Sell'
+    return {
+      id: `${symbol}-${idx}`,
+      price,
+      side,
+      label: `${side} #${idx + 1}`,
+    }
+  })
 }
 
 // -----------------------------------------------------------------------------
