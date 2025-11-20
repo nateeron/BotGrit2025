@@ -17,6 +17,7 @@ export interface OhlcPoint {
   high: number
   low: number
   close: number
+  volume?: number
 }
 
 export interface OrderItem {
@@ -64,6 +65,7 @@ const buildOhlc = (basePrice: number, candles = 120): OhlcPoint[] => {
       high,
       low,
       close,
+      volume: Math.abs(close - open) * 1000,
     })
   }
   return points
@@ -126,6 +128,186 @@ export const pingMockApi = async () => {
     await axios.get('https://httpbin.org/get')
   } catch {
     // ignore network errors for mock
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Real data services for Lightweight Charts
+// -----------------------------------------------------------------------------
+
+const INFO_PRICE_BASE_URL =
+  import.meta.env.VITE_INFO_PRICE_URL ?? 'http://127.0.0.1:45441'
+const BOTGRID_BASE_URL =
+  import.meta.env.VITE_BOTGRID_URL ?? 'http://127.0.0.1:45441'
+const BANGKOK_OFFSET_SECONDS = 7 * 60 * 60
+
+const formatTimestampForApi = (unixSeconds: number) => {
+  const date = new Date((unixSeconds - BANGKOK_OFFSET_SECONDS) * 1000)
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  const hours = String(date.getUTCHours()).padStart(2, '0')
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0')
+  const seconds = String(date.getUTCSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+const toUTCTimestamp = (ms: number): UTCTimestamp =>
+  (Math.floor(ms / 1000) + BANGKOK_OFFSET_SECONDS) as UTCTimestamp
+
+const postJson = async <T>(url: string, payload: unknown): Promise<T> => {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`)
+  }
+  return response.json() as Promise<T>
+}
+
+interface InfoPriceRow {
+  timestamp: number
+  open: number | string
+  high: number | string
+  low: number | string
+  close: number | string
+  volume?: number | string
+}
+
+const normalizeRows = (rows: InfoPriceRow[]): OhlcPoint[] =>
+  rows.map((row) => ({
+    time: toUTCTimestamp(row.timestamp),
+    open: Number(row.open),
+    high: Number(row.high),
+    low: Number(row.low),
+    close: Number(row.close),
+    volume: row.volume ? Number(row.volume) : undefined,
+  }))
+
+const buildInfoPricePayload = (
+  symbol: string,
+  interval: string,
+  limit?: number,
+  from?: number,
+  to?: number,
+) => ({
+  symbol,
+  tf: interval,
+  getAll: false,
+  datefrom: from ? formatTimestampForApi(from) : '',
+  dateto: to ? formatTimestampForApi(to) : '',
+  ohlc: 'ohlc',
+  limit: limit ?? 1000,
+})
+
+export interface FetchChartParams {
+  symbol: string
+  interval: string
+  from?: number
+  to?: number
+  limit?: number
+}
+
+export const fetchChartBootstrap = async (
+  params: FetchChartParams,
+): Promise<OhlcPoint[]> => {
+  const rows = await postJson<InfoPriceRow[]>(
+    `${INFO_PRICE_BASE_URL}/infoPrice/getprice_start`,
+    buildInfoPricePayload(
+      params.symbol,
+      params.interval,
+      params.limit,
+      params.from,
+      params.to,
+    ),
+  )
+  return normalizeRows(rows)
+}
+
+export const fetchChartWindow = async (
+  params: FetchChartParams,
+): Promise<OhlcPoint[]> => {
+  const rows = await postJson<InfoPriceRow[]>(
+    `${INFO_PRICE_BASE_URL}/infoPrice/Load_bar_lazy`,
+    buildInfoPricePayload(
+      params.symbol,
+      params.interval,
+      params.limit,
+      params.from,
+      params.to,
+    ),
+  )
+  return normalizeRows(rows)
+}
+
+export interface BacktestTrade {
+  timestem_buy: number
+  timestem_sell: number | null
+  priceAction: number
+  priceSell: number
+  status: number
+}
+
+export interface BacktestParams {
+  symbol: string
+  interval: string
+  startTime: number
+  limit?: number
+}
+
+export const fetchBacktestTrades = async (
+  params: BacktestParams,
+): Promise<BacktestTrade[]> =>
+  postJson<BacktestTrade[]>(
+    `${BOTGRID_BASE_URL}/botgrid/data_Backtest`,
+    {
+      symbol: params.symbol,
+      tf: params.interval,
+      DateFrom: params.startTime,
+      limit: params.limit ?? 1000,
+    },
+  )
+
+export type KlineListener = (candle: OhlcPoint) => void
+
+export const subscribeBinanceKlines = (
+  symbol: string,
+  interval: string,
+  listener: KlineListener,
+) => {
+  if (typeof window === 'undefined' || typeof WebSocket === 'undefined') {
+    return () => {}
+  }
+  const stream = `${symbol.toLowerCase()}@kline_${interval}`
+  const socket = new WebSocket(`wss://stream.binance.com:9443/ws/${stream}`)
+
+  socket.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(event.data)
+      const candle = payload?.k
+      if (!candle) return
+      const point: OhlcPoint = {
+        time: toUTCTimestamp(candle.t),
+        open: Number(candle.o),
+        high: Number(candle.h),
+        low: Number(candle.l),
+        close: Number(candle.c),
+        volume: Number(candle.v),
+      }
+      listener(point)
+    } catch {
+      // ignore malformed messages
+    }
+  }
+
+  socket.onerror = () => {
+    socket.close()
+  }
+
+  return () => {
+    socket.close()
   }
 }
 

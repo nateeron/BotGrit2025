@@ -1,5 +1,6 @@
 import { Box, Grid, Typography } from '@mui/material'
 import TopChartToolbar from '../components/layout/TopChartToolbar'
+import IndicatorManager from '../components/trading/IndicatorManager'
 import PriceChart from '../components/trading/PriceChart'
 import CoinListSidebar from '../components/layout/CoinListSidebar'
 import CardBotSetting from '../components/trading/CardBotSetting'
@@ -15,6 +16,9 @@ export const TradingPage = () => {
       <Grid container spacing={3}>
         <Grid size={12}>
           <TopChartToolbar />
+        </Grid>
+        <Grid size={12}>
+          <IndicatorManager />
         </Grid>
 
         <Grid size={{ xs: 12, lg: 8 }}>

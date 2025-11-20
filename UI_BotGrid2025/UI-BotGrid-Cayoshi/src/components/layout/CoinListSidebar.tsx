@@ -133,6 +133,8 @@ export const CoinListSidebar = () => {
                       </Typography>
                     </Box>
                   }
+                  primaryTypographyProps={{ component: 'div' }}
+                  secondaryTypographyProps={{ component: 'div' }}
                 />
               </ListItemButton>
             )

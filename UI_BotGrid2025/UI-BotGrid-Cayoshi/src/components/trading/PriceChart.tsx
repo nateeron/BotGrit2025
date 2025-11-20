@@ -1,67 +1,247 @@
-import { useEffect, useRef, useState } from 'react'
-import { Box, CircularProgress, Typography } from '@mui/material'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Box, CircularProgress, Typography } from '@mui/material'
 import {
   AreaSeries,
   CandlestickSeries,
   HistogramSeries,
   LineSeries,
-  createChart,
   LineStyle,
+  createSeriesMarkers,
+  createChart,
 } from 'lightweight-charts'
 import type {
+  AreaSeriesPartialOptions,
+  CandlestickData,
+  CandlestickSeriesPartialOptions,
+  HistogramSeriesPartialOptions,
   IChartApi,
   ISeriesApi,
-  CandlestickSeriesPartialOptions,
-  AreaSeriesPartialOptions,
-  HistogramSeriesPartialOptions,
+  LineData,
+  LineSeriesPartialOptions,
+  SeriesMarker,
+  ISeriesMarkersPluginApi,
+  Time,
+  UTCTimestamp,
 } from 'lightweight-charts'
-import type { OhlcPoint } from '../../services/api'
-import { getOHLC } from '../../services/api'
-import { useTradingStore } from '../../store/tradingStore'
+import {
+  fetchBacktestTrades,
+  fetchChartBootstrap,
+  fetchChartWindow,
+  subscribeBinanceKlines,
+  type BacktestTrade,
+  type OhlcPoint,
+} from '../../services/api'
+import { useTradingStore, type IndicatorConfig } from '../../store/tradingStore'
+import {
+  calculateBollingerBands,
+  calculateEMA,
+  calculateRSI,
+  calculateSMA,
+} from '../../utils/indicatorMath'
 
-type MainSeries =
-  | ISeriesApi<'Candlestick'>
-  | ISeriesApi<'Area'>
+type MainSeries = ISeriesApi<'Candlestick'> | ISeriesApi<'Area'>
+
+const FALLBACK_VOLUME_MULTIPLIER = 120
+
+const sanitizeSeries = (points: OhlcPoint[]) => {
+  const sorted = [...points].sort((a, b) => Number(a.time) - Number(b.time))
+  return sorted.filter(
+    (point, index) => index === 0 || point.time !== sorted[index - 1].time,
+  )
+}
+
+const createIndicatorSeries = (
+  chart: IChartApi,
+  data: OhlcPoint[],
+  config: IndicatorConfig,
+) => {
+  const seriesList: ISeriesApi<'Line'>[] = []
+  const baseOptions: LineSeriesPartialOptions = {
+    color: config.color,
+    lineWidth: 2,
+  }
+
+  const addLine = (
+    lineData: LineData<UTCTimestamp>[],
+    options: Partial<LineSeriesPartialOptions> = {},
+  ) => {
+    if (!lineData.length) return
+    const series = chart.addSeries(LineSeries, {
+      ...baseOptions,
+      ...options,
+    }) as ISeriesApi<'Line'>
+    series.setData(lineData)
+    seriesList.push(series)
+  }
+
+  switch (config.type) {
+    case 'sma':
+      addLine(calculateSMA(data, config.params.period ?? 20))
+      break
+    case 'ema':
+      addLine(calculateEMA(data, config.params.period ?? 20))
+      break
+    case 'bollinger': {
+      const bands = calculateBollingerBands(
+        data,
+        config.params.period ?? 20,
+        config.params.stdDev ?? 2,
+      )
+      addLine(bands.upper)
+      addLine(bands.middle, { color: '#ffffff', lineWidth: 1 })
+      addLine(bands.lower)
+      break
+    }
+    case 'rsi':
+      addLine(calculateRSI(data, config.params.period ?? 14), {
+        priceScaleId: 'right',
+      })
+      break
+    default:
+      break
+  }
+
+  return seriesList
+}
+
+const toCandles = (points: OhlcPoint[]): CandlestickData<UTCTimestamp>[] =>
+  points.map((point) => ({
+    time: point.time,
+    open: point.open,
+    high: point.high,
+    low: point.low,
+    close: point.close,
+  }))
+
+const toAreaData = (points: OhlcPoint[]) =>
+  points.map((point) => ({
+    time: point.time,
+    value: point.close,
+  }))
+
+const toHistogramData = (points: OhlcPoint[]) =>
+  points.map((point) => ({
+    time: point.time,
+    value:
+      point.volume ??
+      Math.abs(point.close - point.open) * FALLBACK_VOLUME_MULTIPLIER +
+        1000,
+    color: point.close >= point.open ? '#26a69a' : '#ef5350',
+  }))
+
+const intervalToSeconds = (interval: string) => {
+  const unit = interval.slice(-1)
+  const value = Number(interval.slice(0, -1))
+  const multipliers: Record<string, number> = {
+    s: 1,
+    m: 60,
+    h: 3600,
+    d: 86400,
+    w: 604800,
+  }
+  return (multipliers[unit] ?? 60) * value
+}
+
+const convertTradesToMarkers = (
+  trades: BacktestTrade[],
+): SeriesMarker<UTCTimestamp>[] => {
+  const duplicates = new Map<number, number>()
+  return trades.flatMap((trade) => {
+    const buyTime = (Math.floor(trade.timestem_buy / 1000) +
+      7 * 60 * 60) as UTCTimestamp
+    const buyMarker: SeriesMarker<UTCTimestamp> = {
+      time: buyTime,
+      position: 'belowBar',
+      color: '#4A9FE6',
+      shape: 'arrowUp',
+      text: `Buy @ ${Number(trade.priceAction).toFixed(4)}`,
+    }
+    if (!trade.timestem_sell || trade.status === 0) {
+      return [buyMarker]
+    }
+    const sellTime = (Math.floor(trade.timestem_sell / 1000) +
+      7 * 60 * 60) as UTCTimestamp
+    const duplicateCount = duplicates.get(trade.timestem_sell) ?? 0
+    duplicates.set(trade.timestem_sell, duplicateCount + 1)
+    const suffix = duplicateCount > 0 ? ` x${duplicateCount + 1}` : ''
+    const sellMarker: SeriesMarker<UTCTimestamp> = {
+      time: sellTime,
+      position: 'aboveBar',
+      color: '#DA46EE',
+      shape: 'arrowDown',
+      text: `Sell @ ${Number(trade.priceSell).toFixed(4)}${suffix}`,
+    }
+    return [buyMarker, sellMarker]
+  })
+}
 
 export const PriceChart = () => {
   const {
     selectedCoin,
     timeframe,
     chartMode,
-    showVolume,
     showIndicators,
+    showVolume,
     fullscreenChart,
   } = useTradingStore()
+
+  const symbolPair = useMemo(
+    () => `${selectedCoin}USDT`,
+    [selectedCoin],
+  )
+  const interval = useMemo(
+    () => (timeframe === '1D' ? '1d' : timeframe),
+    [timeframe],
+  )
+
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const mainSeriesRef = useRef<MainSeries | null>(null)
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
-  const indicatorSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
-  const [loading, setLoading] = useState(false)
+  const indicatorSeriesRef = useRef<Record<string, ISeriesApi<'Line'>[]>>({})
+  const realtimeCleanupRef = useRef<() => void>(() => {})
+  const dataRef = useRef<OhlcPoint[]>([])
+  const startTimestampRef = useRef<UTCTimestamp | null>(null)
+  const loadingMoreRef = useRef(false)
+  const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
+
+  const indicatorConfigs = useTradingStore((state) => state.indicatorConfigs)
+  const loadIndicatorConfigs = useTradingStore(
+    (state) => state.loadIndicatorConfigs,
+  )
+
   const [data, setData] = useState<OhlcPoint[]>([])
+  const [markers, setMarkers] = useState<SeriesMarker<UTCTimestamp>[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    loadIndicatorConfigs()
+  }, [loadIndicatorConfigs])
 
   useEffect(() => {
     if (!containerRef.current) return
-
     chartRef.current = createChart(containerRef.current, {
       layout: {
         background: { color: 'transparent' },
-        textColor: '#c6d1f0',
+        textColor: '#e4e7ef',
       },
       grid: {
-        vertLines: { color: 'rgba(255,255,255,0.05)' },
-        horzLines: { color: 'rgba(255,255,255,0.05)' },
+        vertLines: { color: 'rgba(255,255,255,0.04)' },
+        horzLines: { color: 'rgba(255,255,255,0.04)' },
       },
       crosshair: {
         mode: 1,
-        vertLine: { color: '#1976d2', width: 1, style: LineStyle.Solid },
-        horzLine: { color: '#1976d2', width: 1, style: LineStyle.Solid },
+        vertLine: { color: '#63c20b', width: 1, style: LineStyle.Solid },
+        horzLine: { color: '#63c20b', width: 1, style: LineStyle.Solid },
       },
       rightPriceScale: {
         borderColor: 'rgba(255,255,255,0.08)',
       },
       timeScale: {
         borderColor: 'rgba(255,255,255,0.08)',
+        timeVisible: true,
+        secondsVisible: false,
       },
     })
 
@@ -72,128 +252,263 @@ export const PriceChart = () => {
         chartRef.current?.applyOptions({ width, height })
       })
     })
-
     resizeObserver.observe(containerRef.current)
 
     return () => {
       resizeObserver.disconnect()
+      realtimeCleanupRef.current?.()
       chartRef.current?.remove()
       chartRef.current = null
     }
   }, [])
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      const points = await getOHLC(selectedCoin, timeframe)
-      setData(points)
-      setLoading(false)
+  const handleRealtimeCandle = useCallback((candle: OhlcPoint) => {
+    const index = dataRef.current.findIndex(
+      (item) => item.time === candle.time,
+    )
+    if (index >= 0) {
+      dataRef.current[index] = candle
+    } else {
+      dataRef.current.push(candle)
     }
-    fetchData()
-  }, [selectedCoin, timeframe])
+    const series = mainSeriesRef.current
+    if (series?.seriesType() === 'Candlestick') {
+      ;(series as ISeriesApi<'Candlestick'>).update(candle)
+    } else if (series) {
+      ;(series as ISeriesApi<'Area'>).update({
+        time: candle.time,
+        value: candle.close,
+      })
+    }
+    setData([...dataRef.current])
+    if (volumeSeriesRef.current) {
+      volumeSeriesRef.current.update({
+        time: candle.time,
+        value:
+          candle.volume ??
+          Math.abs(candle.close - candle.open) * FALLBACK_VOLUME_MULTIPLIER +
+            1000,
+        color: candle.close >= candle.open ? '#26a69a' : '#ef5350',
+      })
+    }
+  }, [])
+
+  const loadMarkers = useCallback(
+    async (startTime: UTCTimestamp | null) => {
+      if (!startTime) {
+        setMarkers([])
+        return
+      }
+      try {
+        const trades = await fetchBacktestTrades({
+          symbol: symbolPair,
+          interval,
+          startTime,
+          limit: 1000,
+        })
+        setMarkers(convertTradesToMarkers(trades))
+      } catch (markerError) {
+        console.warn('loadMarkers error', markerError)
+        setMarkers([])
+      }
+    },
+    [interval, symbolPair],
+  )
+
+  const loadMoreBars = useCallback(async () => {
+    if (loadingMoreRef.current) return
+    const startTime = startTimestampRef.current
+    if (!startTime) return
+    loadingMoreRef.current = true
+    try {
+      const seconds = intervalToSeconds(interval)
+      const to = startTime - seconds
+      const from = to - seconds * 800
+      const windowData = sanitizeSeries(
+        await fetchChartWindow({
+          symbol: symbolPair,
+          interval,
+          from,
+          to,
+          limit: 1000,
+        }),
+      )
+      if (windowData.length) {
+        const merged = sanitizeSeries([...windowData, ...dataRef.current])
+        dataRef.current = merged
+        startTimestampRef.current = windowData[0].time
+        setData(merged)
+      }
+    } catch (err) {
+      console.warn('loadMoreBars failed', err)
+    } finally {
+      loadingMoreRef.current = false
+    }
+  }, [interval, symbolPair])
+
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
+    const handler = () => {
+      const series = mainSeriesRef.current
+      if (!series) return
+      const range = chart.timeScale().getVisibleLogicalRange()
+      if (!range) return
+      const barsInfo = series.barsInLogicalRange(range)
+      if (barsInfo?.barsBefore !== undefined && barsInfo.barsBefore < -20) {
+        loadMoreBars()
+      }
+    }
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handler)
+    return () => {
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler)
+    }
+  }, [loadMoreBars])
+
+  useEffect(() => {
+    let cancelled = false
+    const bootstrap = async () => {
+      setLoading(true)
+      setError(null)
+      realtimeCleanupRef.current?.()
+      try {
+        const candles = sanitizeSeries(
+          await fetchChartBootstrap({
+            symbol: symbolPair,
+            interval,
+            limit: 1000,
+          }),
+        )
+        if (cancelled) return
+        dataRef.current = candles
+        startTimestampRef.current = candles[0]?.time ?? null
+        setData(candles)
+        await loadMarkers(candles[0]?.time ?? null)
+        realtimeCleanupRef.current = subscribeBinanceKlines(
+          symbolPair,
+          interval,
+          handleRealtimeCandle,
+        )
+      } catch (err) {
+        if (!cancelled) {
+          setError('ไม่สามารถโหลดข้อมูลกราฟได้')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+    bootstrap()
+    return () => {
+      cancelled = true
+    }
+  }, [handleRealtimeCandle, interval, loadMarkers, symbolPair])
 
   useEffect(() => {
     if (!chartRef.current || data.length === 0) return
+    const chart = chartRef.current
+    const normalized = sanitizeSeries(data)
 
     if (mainSeriesRef.current) {
-      chartRef.current.removeSeries(mainSeriesRef.current)
+      chart.removeSeries(mainSeriesRef.current)
+      mainSeriesRef.current = null
     }
+    if (markersPluginRef.current) {
+      markersPluginRef.current.detach()
+      markersPluginRef.current = null
+    }
+    Object.values(indicatorSeriesRef.current).forEach((lines) => {
+      lines.forEach((line) => chart.removeSeries(line))
+    })
+    indicatorSeriesRef.current = {}
     if (volumeSeriesRef.current) {
-      chartRef.current.removeSeries(volumeSeriesRef.current)
+      chart.removeSeries(volumeSeriesRef.current)
       volumeSeriesRef.current = null
-    }
-    if (indicatorSeriesRef.current) {
-      chartRef.current.removeSeries(indicatorSeriesRef.current)
-      indicatorSeriesRef.current = null
     }
 
     if (chartMode === 'candle') {
       const options: CandlestickSeriesPartialOptions = {
         upColor: '#26a69a',
         downColor: '#ef5350',
-        borderUpColor: '#26a69a',
-        borderDownColor: '#ef5350',
         wickUpColor: '#26a69a',
         wickDownColor: '#ef5350',
+        borderVisible: false,
       }
-      const candlestick = chartRef.current.addSeries(
+      const series = chart.addSeries(
         CandlestickSeries,
         options,
       ) as ISeriesApi<'Candlestick'>
-      candlestick.setData(data)
-      mainSeriesRef.current = candlestick
+      series.setData(toCandles(normalized))
+      markersPluginRef.current = createSeriesMarkers(series)
+      markersPluginRef.current?.setMarkers(markers as SeriesMarker<Time>[])
+      mainSeriesRef.current = series
     } else {
       const options: AreaSeriesPartialOptions = {
-        topColor: 'rgba(25,118,210,0.4)',
-        bottomColor: 'rgba(25,118,210,0.05)',
+        topColor: 'rgba(25,118,210,0.35)',
+        bottomColor: 'rgba(25,118,210,0.02)',
         lineColor: '#90caf9',
         lineWidth: 2,
       }
-      const area = chartRef.current.addSeries(AreaSeries, options) as ISeriesApi<'Area'>
-      area.setData(
-        data.map((point) => ({
-          time: point.time,
-          value: point.close,
-        })),
-      )
-      mainSeriesRef.current = area
+      const series = chart.addSeries(
+        AreaSeries,
+        options,
+      ) as ISeriesApi<'Area'>
+      series.setData(toAreaData(normalized))
+      mainSeriesRef.current = series
     }
 
-    if (showIndicators) {
-      const indicator = chartRef.current.addSeries(LineSeries, {
-        color: '#fdd835',
-        lineWidth: 2,
-      }) as ISeriesApi<'Line'>
-      indicator.setData(
-        data.map((point, idx, array) => {
-          const window = array.slice(Math.max(0, idx - 9), idx + 1)
-          const avg =
-            window.reduce((sum, candle) => sum + candle.close, 0) / window.length
-          return {
-            time: point.time,
-            value: avg,
-          }
-        }),
-      )
-      indicatorSeriesRef.current = indicator
+    if (showIndicators && indicatorConfigs.length > 0) {
+      indicatorConfigs.forEach((config) => {
+        const created = createIndicatorSeries(
+          chart,
+          normalized,
+          config,
+        )
+        if (created.length > 0) {
+          indicatorSeriesRef.current[config.id] = created
+        }
+      })
     }
 
     if (showVolume) {
       const histogramOptions: HistogramSeriesPartialOptions = {
-        priceFormat: {
-          type: 'volume',
-        },
+        priceFormat: { type: 'volume' },
         priceLineVisible: false,
-        color: 'rgba(255,255,255,0.3)',
         baseLineColor: 'transparent',
       }
-      const histogram = chartRef.current.addSeries(HistogramSeries, {
-        ...histogramOptions,
-        priceScaleId: '',
-      }) as ISeriesApi<'Histogram'>
-      histogram.priceScale().applyOptions({
-        scaleMargins: {
-          top: 0.7,
-          bottom: 0,
+      const histogram = chart.addSeries(
+        HistogramSeries,
+        {
+          ...histogramOptions,
+          priceScaleId: '',
         },
+      ) as ISeriesApi<'Histogram'>
+      histogram.priceScale().applyOptions({
+        scaleMargins: { top: 0.7, bottom: 0 },
       })
-      histogram.setData(
-        data.map((point) => ({
-          time: point.time,
-          value: Math.abs(point.close - point.open) * 120 + 1000,
-          color: point.close >= point.open ? '#26a69a' : '#ef5350',
-        })),
-      )
+      histogram.setData(toHistogramData(normalized))
       volumeSeriesRef.current = histogram
     }
 
-    chartRef.current.timeScale().fitContent()
-  }, [chartMode, data, showIndicators, showVolume])
+    chart.timeScale().fitContent()
+  }, [chartMode, data, indicatorConfigs, markers, showIndicators, showVolume])
+
+  useEffect(() => {
+    if (!markersPluginRef.current) return
+    if (chartMode !== 'candle') {
+      markersPluginRef.current.setMarkers([])
+      return
+    }
+    markersPluginRef.current.setMarkers(markers as SeriesMarker<Time>[])
+  }, [chartMode, markers])
 
   useEffect(() => {
     const height = fullscreenChart ? 520 : 380
     chartRef.current?.applyOptions({ height })
   }, [fullscreenChart])
+
+  const shouldShowPlaceholder = !loading && data.length === 0
 
   return (
     <Box
@@ -221,6 +536,40 @@ export const PriceChart = () => {
           <CircularProgress />
         </Box>
       )}
+      {error && !loading && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            px: 3,
+            zIndex: 2,
+          }}
+        >
+          <Alert severity="error" variant="filled">
+            {error}
+          </Alert>
+        </Box>
+      )}
+      {shouldShowPlaceholder && !error && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'text.secondary',
+            zIndex: 1,
+          }}
+        >
+          <Typography variant="body2">
+            ไม่พบข้อมูลสำหรับ {symbolPair} / {interval}
+          </Typography>
+        </Box>
+      )}
       <Box
         ref={containerRef}
         sx={{
@@ -236,12 +585,15 @@ export const PriceChart = () => {
           display: 'flex',
           flexDirection: 'column',
           gap: 0.5,
+          pointerEvents: 'none',
         }}
       >
-        <Typography variant="h6">{selectedCoin}/USDT</Typography>
+        <Typography variant="h6">
+          {selectedCoin}/USDT · {interval.toUpperCase()}
+        </Typography>
         <Typography variant="caption" color="text.secondary">
-          Timeframe: {timeframe} · {chartMode === 'candle' ? 'Candles' : 'Line'}
-          {showIndicators ? ' · Indicators' : ''} {showVolume ? ' · Volume' : ''}
+          {chartMode === 'candle' ? 'Candlestick' : 'Line'} Mode
+          {showIndicators ? ' · MA(20/90)' : ''} {showVolume ? ' · Volume' : ''}
         </Typography>
       </Box>
     </Box>
@@ -249,4 +601,3 @@ export const PriceChart = () => {
 }
 
 export default PriceChart
-
