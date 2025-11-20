@@ -188,6 +188,7 @@ export const PriceChart = () => {
     showIndicators,
     showVolume,
     fullscreenChart,
+    toggleFullscreen,
   } = useTradingStore()
 
   const symbolPair = useMemo(
@@ -285,10 +286,14 @@ export const PriceChart = () => {
   }, [])
 
   useEffect(() => {
-    if (!containerRef.current) return
-    const rsiContainer = document.getElementById('tv_rsi_container')
-    if (!rsiContainer) return
-    rsiChartRef.current = createChart(rsiContainer, {
+    const container = document.getElementById('tv_rsi_container')
+    if (!container) return
+    if (rsiChartRef.current) {
+      rsiChartRef.current.remove()
+      rsiChartRef.current = null
+      rsiSeriesRef.current = null
+    }
+    rsiChartRef.current = createChart(container, {
       height: 160,
       layout: {
         background: { color: 'transparent' },
@@ -307,18 +312,31 @@ export const PriceChart = () => {
       },
     })
     const handleResize = () => {
-      if (!rsiContainer || !rsiChartRef.current) return
-      const { width } = rsiContainer.getBoundingClientRect()
+      if (!container || !rsiChartRef.current) return
+      const { width } = container.getBoundingClientRect()
       rsiChartRef.current.applyOptions({ width })
     }
     window.addEventListener('resize', handleResize)
     return () => {
       window.removeEventListener('resize', handleResize)
-      rsiChartRef.current?.remove()
-      rsiChartRef.current = null
-      rsiSeriesRef.current = null
+      if (rsiChartRef.current) {
+        rsiChartRef.current.remove()
+        rsiChartRef.current = null
+        rsiSeriesRef.current = null
+      }
     }
-  }, [])
+  }, [fullscreenChart])
+
+  useEffect(() => {
+    if (!fullscreenChart) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        toggleFullscreen()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [fullscreenChart, toggleFullscreen])
 
   const handleRealtimeCandle = useCallback((candle: OhlcPoint) => {
     const index = dataRef.current.findIndex(
@@ -625,18 +643,46 @@ export const PriceChart = () => {
 
   const shouldShowPlaceholder = !loading && data.length === 0
 
+  const chartShellStyles = fullscreenChart
+    ? {
+        position: 'fixed' as const,
+        top: 120,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1500,
+        backgroundColor: '#0d1117',
+        padding: 2,
+        display: 'flex',
+        flexDirection: 'column' as const,
+        gap: 2,
+      }
+    : {
+        display: 'flex',
+        flexDirection: 'column' as const,
+        gap: 2,
+      }
+
+  const mainChartStyles = fullscreenChart
+    ? {
+        position: 'relative' as const,
+        flexGrow: 1,
+        borderRadius: 3,
+        overflow: 'hidden',
+        backgroundColor: 'rgba(255,255,255,0.02)',
+      }
+    : {
+        position: 'relative' as const,
+        flexGrow: 1,
+        minHeight: 380,
+        borderRadius: 3,
+        overflow: 'hidden',
+        backgroundColor: 'rgba(255,255,255,0.02)',
+      }
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box
-        sx={{
-          position: 'relative',
-          flexGrow: 1,
-          minHeight: fullscreenChart ? 520 : 380,
-          borderRadius: 3,
-          overflow: 'hidden',
-          backgroundColor: 'rgba(255,255,255,0.02)',
-        }}
-      >
+    <Box sx={chartShellStyles}>
+      <Box sx={mainChartStyles} tabIndex={fullscreenChart ? 0 : -1}>
         {loading && (
           <Box
             sx={{
@@ -725,10 +771,7 @@ export const PriceChart = () => {
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
           RSI (14)
         </Typography>
-        <Box
-          id="tv_rsi_container"
-          sx={{ width: '100%', height: 140 }}
-        />
+        <Box id="tv_rsi_container" sx={{ width: '100%', height: 140 }} />
       </Box>
     </Box>
   )
