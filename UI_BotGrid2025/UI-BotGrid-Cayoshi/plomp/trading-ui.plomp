@@ -1,0 +1,166 @@
+# PL0MP: React Trading UI App
+# Goal:
+สร้าง UI หน้าเว็บเทรดแบบมืออาชีพ ด้วย React + TypeScript + MUI + Zustand
+ให้ Cursor สร้างโค้ดทั้งหมดตามโครงสร้างด้านล่าง
+
+===========================================================
+PROJECT SETUP
+===========================================================
+
+Tech Stack:
+- React + TypeScript + Vite
+- Material UI (MUI)
+- Zustand (global store)
+- Lightweight-Charts (กราฟแท่งเทียน)
+- Axios (เรียก API)
+- MUI SX styling
+
+สร้างโฟลเดอร์:
+src/
+  components/
+    layout/
+      LeftMenuMini.tsx
+      TopChartToolbar.tsx
+      CoinListSidebar.tsx
+    trading/
+      PriceChart.tsx
+      CardBotSetting.tsx
+      CardOrderList.tsx
+      CardReport.tsx
+  pages/
+      TradingPage.tsx
+      ReportPage.tsx
+  store/
+      tradingStore.ts
+  services/
+      api.ts
+  App.tsx
+  main.tsx
+
+ให้ Cursor Gen ไฟล์ทั้งหมด พร้อม mock data
+
+===========================================================
+UI DESIGN REQUIREMENTS
+===========================================================
+
+Main Layout (TradingPage):
+
+-------------------------------------------------------------
+| LeftMiniMenu |      MAIN AREA                             |
+| (mini)       |---------------------------------------------|
+|              |  TopChartToolbar:                           |
+|              |   - Timeframe switch                        |
+|              |   - Candle/Line                             |
+|              |   - Indicators toggle                       |
+|              |---------------------------------------------|
+|              |  Row:                                       |
+|              |    - PriceChart (70%)                       |
+|              |    - CoinListSidebar (30%)                  |
+|              |---------------------------------------------|
+|              | Bottom Cards Row:                           |
+|              |   - CardBotSetting                          |
+|              |   - CardOrderList                           |
+|              |   - CardReport                              |
+--------------------------------------------------------------
+
+STYLE:
+- Dark mode theme (พื้นหลัง: #0d1117)
+- Card radius: 12px
+- Hover effect smooth
+- Responsive design
+
+===========================================================
+COMPONENT DETAILS
+===========================================================
+
+LeftMenuMini:
+- Mini vertical menu
+- Icons only
+- Nav items: Trade, Bot, Orders, Report, Settings
+- Hover → Expand menu
+
+TopChartToolbar:
+- Dropdown: Timeframe (1m,5m,15m,1h,4h,1D)
+- Switch: Candle / Line
+- Toggle: Indicators
+- Toggle: Volume
+- Fullscreen button
+
+PriceChart:
+- ใช้ lightweight-charts
+- Candlestick chart
+- Crosshair
+- Zoom/Pan
+- Responsive
+
+CoinListSidebar:
+- Search box
+- List ของเหรียญ BTC / ETH / XRP / BNB / SOL / ADA / DOGE
+- Show price + 24h change %
+
+CardBotSetting:
+- Strategy: Grid, DCA, Scalping
+- Inputs: TP, SL, Grid distance
+- Start / Stop button
+
+CardOrderList:
+- Table:
+  - Order ID
+  - Side (Buy/Sell)
+  - Price
+  - Amount
+  - PnL
+  - Status
+
+CardReport:
+- Tabs = Daily | Monthly | Yearly
+- Summary + small bar chart
+
+===========================================================
+STATE MANAGEMENT (Zustand)
+===========================================================
+
+Store: tradingStore.ts
+State:
+- selectedCoin: string
+- timeframe: string
+- chartMode: "candle" | "line"
+- toggle indicators
+- toggle volume
+
+Actions:
+- setSelectedCoin
+- setTimeframe
+- setChartMode
+
+===========================================================
+MOCK API
+===========================================================
+
+services/api.ts:
+- getCoins()
+- getOHLC(coin, timeframe)
+- getOpenOrders()
+- getDailyReport()
+
+ทั้งหมดให้ Cursor สร้าง mock data
+
+===========================================================
+CODE GENERATION RULES
+===========================================================
+
+Cursor ต้อง:
+✔ สร้างทุก component
+✔ ใช้ MUI Grid layout
+✔ ใช้ MUI dark theme
+✔ ใช้ Zustand เป็น state
+✔ ใช้ mock API ชั่วคราว
+✔ ทุก card ใช้ <Card sx={{ p:2, borderRadius:2 }}>
+✔ ทุกหน้าต้อง responsive
+
+เริ่มสร้างจากหน้า TradingPage.tsx ก่อน
+
+===========================================================
+END OF PL0MP
+===========================================================
+
