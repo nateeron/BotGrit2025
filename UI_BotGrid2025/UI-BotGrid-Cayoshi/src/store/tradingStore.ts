@@ -60,6 +60,10 @@ interface TradingState {
   loadSettings: () => void
   showBuySellLines: boolean
   setShowBuySellLines: (show: boolean) => void
+  showPlotLine: boolean
+  setShowPlotLine: (show: boolean) => void
+  showBacktest: boolean
+  setShowBacktest: (show: boolean) => void
   reloadBacktestData: (() => void) | null
   setReloadBacktestData: (fn: (() => void) | null) => void
 }
@@ -182,6 +186,10 @@ export const useTradingStore = create<TradingState>((set, get) => {
     priceLevels: [],
     showBuySellLines: true,
     setShowBuySellLines: (show) => set({ showBuySellLines: show }),
+    showPlotLine: false,
+    setShowPlotLine: (show) => set({ showPlotLine: show }),
+    showBacktest: true,
+    setShowBacktest: (show) => set({ showBacktest: show }),
     reloadBacktestData: null,
     setReloadBacktestData: (fn) => set({ reloadBacktestData: fn }),
     setSelectedCoin: (symbol) => {

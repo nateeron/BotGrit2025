@@ -290,6 +290,10 @@ export const TopChartToolbar = () => {
     setShowSettingsDialog,
     showBuySellLines,
     setShowBuySellLines,
+    showPlotLine,
+    setShowPlotLine,
+    showBacktest,
+    setShowBacktest,
     reloadBacktestData,
   } = useTradingStore()
   
@@ -461,11 +465,41 @@ export const TopChartToolbar = () => {
             }
             sx={{ display: { xs: 'none', sm: 'flex' }, margin: 0 }}
           />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showPlotLine}
+                onChange={(e) => setShowPlotLine(e.target.checked)}
+                size="small"
+              />
+            }
+            label={
+              <Typography sx={{ fontSize: '0.7rem' }}>
+                Plot Line
+              </Typography>
+            }
+            sx={{ margin: 0 }}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showBacktest}
+                onChange={(e) => setShowBacktest(e.target.checked)}
+                size="small"
+              />
+            }
+            label={
+              <Typography sx={{ fontSize: '0.7rem' }}>
+                Backtest
+              </Typography>
+            }
+            sx={{ margin: 0 }}
+          />
           <Tooltip title="Reload Backtest Data">
             <IconButton 
               color="inherit" 
               onClick={handleReloadBacktest}
-              disabled={!reloadBacktestData || reloadingTrades}
+              disabled={!reloadBacktestData || reloadingTrades || !showBacktest}
               size="small"
               sx={{ padding: 0.25 }}
             >
@@ -476,7 +510,7 @@ export const TopChartToolbar = () => {
               )}
             </IconButton>
           </Tooltip>
-          <Tooltip title={showBuySellLines ? "Hide Buy/Sell Lines" : "Show Buy/Sell Lines"}>
+          <Tooltip title={showBuySellLines ? "Hide Buy/Sell Markers" : "Show Buy/Sell Markers"}>
             <IconButton 
               color="inherit" 
               onClick={() => setShowBuySellLines(!showBuySellLines)}
