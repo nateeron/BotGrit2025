@@ -1,0 +1,69 @@
+.trading-layout-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+  background-color: #0d1117;
+}
+
+.trading-layout-left {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.trading-layout-right {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  max-width: 300px;
+  flex-shrink: 0;
+}
+
+.trading-layout-top {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.trading-layout-bottom {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.trading-splitter {
+  position: relative;
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+.trading-splitter-horizontal {
+  cursor: row-resize;
+}
+
+.trading-splitter-vertical {
+  cursor: col-resize;
+}
+
+.trading-splitter:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.trading-splitter:active {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Prevent text selection during drag */
+.trading-layout-container.dragging {
+  user-select: none;
+  cursor: inherit;
+}
+
+.trading-layout-container.dragging * {
+  cursor: inherit !important;
+}
+

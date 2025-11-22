@@ -45,6 +45,7 @@ import {
   calculateSMA,
 } from '../../utils/indicatorMath'
 import ChartSettingsDialog from './ChartSettingsDialog'
+import { useChartDataStore } from './useChartData'
 
 type MainSeries = ISeriesApi<'Candlestick'> | ISeriesApi<'Area'>
 
@@ -195,7 +196,6 @@ export const PriceChart = () => {
     showVolume,
     fullscreenChart,
     toggleFullscreen,
-    syncRsiChart,
   } = useTradingStore()
 
   const symbolPair = useMemo(
@@ -209,11 +209,9 @@ export const PriceChart = () => {
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const rsiChartRef = useRef<IChartApi | null>(null)
   const mainSeriesRef = useRef<MainSeries | null>(null)
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const indicatorSeriesRef = useRef<Record<string, ISeriesApi<'Line'>[]>>({})
-  const rsiSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
   const priceLineRefs = useRef<Record<string, PriceLineInstance>>({})
   const realtimeCleanupRef = useRef<() => void>(() => {})
   const dataRef = useRef<OhlcPoint[]>([])
@@ -228,13 +226,13 @@ export const PriceChart = () => {
   )
   const priceLevels = useTradingStore((state) => state.priceLevels)
   const setPriceLevels = useTradingStore((state) => state.setPriceLevels)
+  const setChartData = useChartDataStore((state) => state.setChartData)
 
   const [data, setData] = useState<OhlcPoint[]>([])
   const [markers, setMarkers] = useState<SeriesMarker<UTCTimestamp>[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null)
-  const [rsiMousePos, setRsiMousePos] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     loadIndicatorConfigs()
@@ -324,27 +322,10 @@ export const PriceChart = () => {
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
       setMousePos({ x, y })
-
-      // Sync to RSI chart - sync vertical line position
-      try {
-        const rsiContainer = document.getElementById('tv_rsi_container')
-        if (rsiContainer) {
-          const rsiRect = rsiContainer.getBoundingClientRect()
-          const rsiX = e.clientX - rsiRect.left
-          if (rsiX >= 0 && rsiX <= rsiRect.width) {
-            setRsiMousePos({ x: rsiX, y: 0 })
-          } else {
-            setRsiMousePos(null)
-          }
-        }
-      } catch (e) {
-        // Ignore sync errors
-      }
     }
 
     const handleMouseLeave = () => {
       setMousePos(null)
-      setRsiMousePos(null)
     }
 
     container.addEventListener('mousemove', handleMouseMove)
@@ -355,109 +336,6 @@ export const PriceChart = () => {
       container.removeEventListener('mouseleave', handleMouseLeave)
     }
   }, [data])
-
-
-  useEffect(() => {
-    const container = document.getElementById('tv_rsi_container')
-    if (!container) return
-    if (rsiChartRef.current) {
-      rsiChartRef.current.remove()
-      rsiChartRef.current = null
-      rsiSeriesRef.current = null
-    }
-    // Calculate initial size from container
-    const containerRect = container.getBoundingClientRect()
-    const rsiInitialWidth = containerRect.width
-    const rsiInitialHeight = containerRect.height || 160
-
-    rsiChartRef.current = createChart(container, {
-      width: rsiInitialWidth,
-      height: rsiInitialHeight,
-      layout: {
-        background: { color: 'transparent' },
-        textColor: '#e4e7ef',
-      },
-      grid: {
-        vertLines: { color: 'rgba(255,255,255,0.04)' },
-        horzLines: { color: 'rgba(255,255,255,0.04)' },
-      },
-      rightPriceScale: {
-        borderColor: 'rgba(255,255,255,0.08)',
-        autoScale: true,
-      },
-      timeScale: {
-        borderColor: 'rgba(255,255,255,0.08)',
-      },
-      crosshair: {
-        mode: 0,
-      },
-    })
-    // Use ResizeObserver for RSI chart container
-    const updateRsiChartSize = () => {
-      if (!container || !rsiChartRef.current) return
-      requestAnimationFrame(() => {
-        if (rsiChartRef.current && container) {
-          const currentRect = container.getBoundingClientRect()
-          rsiChartRef.current.applyOptions({ 
-            width: Math.max(1, Math.floor(currentRect.width)),
-            height: Math.max(1, Math.floor(currentRect.height || 160)),
-          })
-        }
-      })
-    }
-
-    const rsiResizeObserver = new ResizeObserver(updateRsiChartSize)
-    
-    // Also listen to window resize as fallback
-    const handleRsiWindowResize = () => {
-      updateRsiChartSize()
-    }
-    window.addEventListener('resize', handleRsiWindowResize)
-    rsiResizeObserver.observe(container)
-
-    // Add mouse event handler for RSI chart
-    const handleRsiMouseMove = (e: MouseEvent) => {
-      const rect = container.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-      setRsiMousePos({ x, y })
-
-      // Sync to main chart
-      if (chartRef.current && containerRef.current) {
-        try {
-          const mainRect = containerRef.current.getBoundingClientRect()
-          const mainX = e.clientX - mainRect.left
-          if (mainX >= 0 && mainX <= mainRect.width) {
-            setMousePos({ x: mainX, y: 0 })
-          } else {
-            setMousePos(null)
-          }
-        } catch (e) {
-          // Ignore sync errors
-        }
-      }
-    }
-
-    const handleRsiMouseLeave = () => {
-      setRsiMousePos(null)
-    }
-
-    container.addEventListener('mousemove', handleRsiMouseMove)
-    container.addEventListener('mouseleave', handleRsiMouseLeave)
-
-    return () => {
-      rsiResizeObserver.disconnect()
-      window.removeEventListener('resize', handleRsiWindowResize)
-      container.removeEventListener('mousemove', handleRsiMouseMove)
-      container.removeEventListener('mouseleave', handleRsiMouseLeave)
-      if (rsiChartRef.current) {
-        rsiChartRef.current.remove()
-        rsiChartRef.current = null
-        rsiSeriesRef.current = null
-      }
-    }
-  }, [fullscreenChart])
-
 
   useEffect(() => {
     if (!fullscreenChart) return
@@ -489,6 +367,7 @@ export const PriceChart = () => {
       })
     }
     setData([...dataRef.current])
+    setChartData([...dataRef.current]) // Share data with RSI chart
     if (volumeSeriesRef.current) {
       volumeSeriesRef.current.update({
         time: candle.time,
@@ -541,11 +420,12 @@ export const PriceChart = () => {
           limit: 1000,
         }),
       )
-      if (windowData.length) {
+        if (windowData.length) {
         const merged = sanitizeSeries([...windowData, ...dataRef.current])
         dataRef.current = merged
         startTimestampRef.current = windowData[0].time
         setData(merged)
+        setChartData(merged) // Share data with RSI chart
       }
     } catch (err) {
       console.warn('loadMoreBars failed', err)
@@ -573,37 +453,6 @@ export const PriceChart = () => {
     }
   }, [loadMoreBars])
 
-  // Sync time scale between main chart and RSI chart
-  useEffect(() => {
-    const mainChart = chartRef.current
-    const rsiChart = rsiChartRef.current
-    if (!mainChart || !rsiChart || !syncRsiChart) return
-
-    const syncTimeScale = () => {
-      try {
-        const visibleRange = mainChart.timeScale().getVisibleRange()
-        if (visibleRange) {
-          rsiChart.timeScale().setVisibleRange(visibleRange)
-        }
-      } catch (e) {
-        // Ignore sync errors
-      }
-    }
-
-    const handler = () => {
-      syncTimeScale()
-    }
-
-    mainChart.timeScale().subscribeVisibleTimeRangeChange(handler)
-    
-    // Initial sync
-    syncTimeScale()
-
-    return () => {
-      mainChart.timeScale().unsubscribeVisibleTimeRangeChange(handler)
-    }
-  }, [syncRsiChart, data])
-
   useEffect(() => {
     let cancelled = false
     const bootstrap = async () => {
@@ -624,6 +473,7 @@ export const PriceChart = () => {
         dataRef.current = candles
         startTimestampRef.current = candles[0]?.time ?? null
         setData(candles)
+        setChartData(candles) // Share data with RSI chart
         await loadMarkers(candles[0]?.time ?? null)
         realtimeCleanupRef.current = subscribeBinanceKlines(
           symbolPair,
@@ -751,21 +601,6 @@ export const PriceChart = () => {
       chart.timeScale().fitContent()
       isInitialLoadRef.current = false
     }
-
-    if (rsiChartRef.current) {
-      if (!rsiSeriesRef.current) {
-        rsiSeriesRef.current = rsiChartRef.current.addSeries(LineSeries, {
-          color: '#29b6f6',
-          lineWidth: 2,
-        }) as ISeriesApi<'Line'>
-      }
-      const rsiData = calculateRSI(normalized, 14)
-      rsiSeriesRef.current.setData(rsiData)
-      // Only fit RSI chart on initial load
-      if (shouldFitContent) {
-        rsiChartRef.current.timeScale().fitContent()
-      }
-    }
   }, [chartMode, data, indicatorConfigs, markers, showIndicators, showVolume])
 
   useEffect(() => {
@@ -833,23 +668,28 @@ export const PriceChart = () => {
     : {
         display: 'flex',
         flexDirection: 'column' as const,
-        gap: 2,
+        width: '100%',
+        height: '100%',
+        minHeight: 0,
+        gap: 0,
       }
 
   const mainChartStyles = fullscreenChart
     ? {
         position: 'relative' as const,
         flexGrow: 1,
-        borderRadius: 3,
+        borderRadius: 0,
         overflow: 'hidden',
         backgroundColor: 'rgba(255,255,255,0.02)',
       }
     : {
         position: 'relative' as const,
         flexGrow: 1,
-        minHeight: { xs: 250, sm: 300, md: 380 },
-        borderRadius: 3,
-        border: '3px solid rgba(255,255,255,0.08)',
+        width: '100%',
+        height: '100%',
+        minHeight: 0,
+        borderRadius: 0,
+        border: 'none',
         overflow: 'hidden',
         backgroundColor: 'rgba(255,255,255,0.02)',
       }
@@ -979,61 +819,6 @@ export const PriceChart = () => {
           </Typography>
         </Box>
         <ChartSettingsDialog />
-      </Box>
-      <Box
-        sx={{
-          borderRadius: 3,
-          border: '3px solid rgba(255,255,255,0.08)',
-          backgroundColor: 'rgba(255,255,255,0.02)',
-          p: { xs: 0.75, md: 1 },
-          minHeight: { xs: 120, sm: 140, md: 160 },
-        }}
-      >
-        <Typography 
-          variant="subtitle2" 
-          sx={{ 
-            mb: { xs: 0.5, md: 1 },
-            fontSize: { xs: '0.75rem', sm: '0.875rem' },
-            px: { xs: 1, md: 0 },
-          }}
-        >
-          RSI (14)
-        </Typography>
-        <Box sx={{ position: 'relative', width: '100%', height: { xs: 100, sm: 120, md: 140 } }}>
-          <Box id="tv_rsi_container" sx={{ width: '100%', height: '100%' }} />
-          {rsiMousePos && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                pointerEvents: 'none',
-                zIndex: 10,
-              }}
-            >
-              <svg
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                }}
-              >
-                <line
-                  x1={rsiMousePos.x}
-                  y1="0"
-                  x2={rsiMousePos.x}
-                  y2="100%"
-                  stroke="#b0b0b0"
-                  strokeWidth="1"
-                />
-              </svg>
-            </Box>
-          )}
-        </Box>
       </Box>
     </Box>
   )
