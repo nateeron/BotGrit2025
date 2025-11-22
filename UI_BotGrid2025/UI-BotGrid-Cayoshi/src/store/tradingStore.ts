@@ -36,6 +36,7 @@ interface TradingState {
   fullscreenChart: boolean
   sidebarCollapsed: boolean
   showSettingsDialog: boolean
+  syncRsiChart: boolean
   indicatorConfigs: IndicatorConfig[]
   tvStudies: StudyConfig[]
   priceLevels: PriceLevel[]
@@ -47,6 +48,7 @@ interface TradingState {
   toggleFullscreen: () => void
   toggleSidebar: () => void
   setShowSettingsDialog: (show: boolean) => void
+  toggleSyncRsiChart: () => void
   loadIndicatorConfigs: () => void
   addIndicatorConfig: (config: IndicatorConfig) => void
   updateIndicatorConfig: (config: IndicatorConfig) => void
@@ -124,6 +126,7 @@ export const useTradingStore = create<TradingState>((set, get) => ({
   fullscreenChart: false,
   sidebarCollapsed: false,
   showSettingsDialog: false,
+  syncRsiChart: true,
   indicatorConfigs: [],
   tvStudies: [],
   priceLevels: [],
@@ -138,6 +141,8 @@ export const useTradingStore = create<TradingState>((set, get) => ({
   toggleSidebar: () =>
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
   setShowSettingsDialog: (show) => set({ showSettingsDialog: show }),
+  toggleSyncRsiChart: () =>
+    set((state) => ({ syncRsiChart: !state.syncRsiChart })),
   loadIndicatorConfigs: () => {
     const configs = readIndicatorsFromSession()
     set({ indicatorConfigs: configs })

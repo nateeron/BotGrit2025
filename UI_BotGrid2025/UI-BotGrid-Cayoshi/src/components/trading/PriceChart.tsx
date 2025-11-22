@@ -4,10 +4,7 @@ import {
   Box,
   CircularProgress,
   Typography,
-  IconButton,
-  Tooltip,
 } from '@mui/material'
-import SettingsIcon from '@mui/icons-material/Settings'
 import {
   AreaSeries,
   CandlestickSeries,
@@ -198,7 +195,7 @@ export const PriceChart = () => {
     showVolume,
     fullscreenChart,
     toggleFullscreen,
-    setShowSettingsDialog,
+    syncRsiChart,
   } = useTradingStore()
 
   const symbolPair = useMemo(
@@ -257,7 +254,15 @@ export const PriceChart = () => {
 
   useEffect(() => {
     if (!containerRef.current) return
+    
+    // Calculate initial size from container
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const initialWidth = containerRect.width
+    const initialHeight = containerRect.height
+
     chartRef.current = createChart(containerRef.current, {
+      width: initialWidth,
+      height: initialHeight,
       layout: {
         background: { color: 'transparent' },
         textColor: '#e4e7ef',
@@ -279,17 +284,31 @@ export const PriceChart = () => {
       },
     })
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      window.requestAnimationFrame(() => {
-        if (!entries[0]) return
-        const { width, height } = entries[0].contentRect
-        chartRef.current?.applyOptions({ width, height })
+    const updateChartSize = () => {
+      if (!containerRef.current || !chartRef.current) return
+      requestAnimationFrame(() => {
+        if (chartRef.current && containerRef.current) {
+          const currentRect = containerRef.current.getBoundingClientRect()
+          chartRef.current.applyOptions({ 
+            width: Math.max(1, Math.floor(currentRect.width)), 
+            height: Math.max(1, Math.floor(currentRect.height))
+          })
+        }
       })
-    })
+    }
+
+    const resizeObserver = new ResizeObserver(updateChartSize)
     resizeObserver.observe(containerRef.current)
+    
+    // Also listen to window resize as fallback
+    const handleWindowResize = () => {
+      updateChartSize()
+    }
+    window.addEventListener('resize', handleWindowResize)
 
     return () => {
       resizeObserver.disconnect()
+      window.removeEventListener('resize', handleWindowResize)
       realtimeCleanupRef.current?.()
       chartRef.current?.remove()
       chartRef.current = null
@@ -346,8 +365,14 @@ export const PriceChart = () => {
       rsiChartRef.current = null
       rsiSeriesRef.current = null
     }
+    // Calculate initial size from container
+    const containerRect = container.getBoundingClientRect()
+    const rsiInitialWidth = containerRect.width
+    const rsiInitialHeight = containerRect.height || 160
+
     rsiChartRef.current = createChart(container, {
-      height: 160,
+      width: rsiInitialWidth,
+      height: rsiInitialHeight,
       layout: {
         background: { color: 'transparent' },
         textColor: '#e4e7ef',
@@ -367,14 +392,64 @@ export const PriceChart = () => {
         mode: 0,
       },
     })
-    const handleResize = () => {
+    // Use ResizeObserver for RSI chart container
+    const updateRsiChartSize = () => {
       if (!container || !rsiChartRef.current) return
-      const { width } = container.getBoundingClientRect()
-      rsiChartRef.current.applyOptions({ width })
+      requestAnimationFrame(() => {
+        if (rsiChartRef.current && container) {
+          const currentRect = container.getBoundingClientRect()
+          rsiChartRef.current.applyOptions({ 
+            width: Math.max(1, Math.floor(currentRect.width)),
+            height: Math.max(1, Math.floor(currentRect.height || 160)),
+          })
+        }
+      })
     }
-    window.addEventListener('resize', handleResize)
+
+    const rsiResizeObserver = new ResizeObserver(updateRsiChartSize)
+    
+    // Also listen to window resize as fallback
+    const handleRsiWindowResize = () => {
+      updateRsiChartSize()
+    }
+    window.addEventListener('resize', handleRsiWindowResize)
+    rsiResizeObserver.observe(container)
+
+    // Add mouse event handler for RSI chart
+    const handleRsiMouseMove = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      setRsiMousePos({ x, y })
+
+      // Sync to main chart
+      if (chartRef.current && containerRef.current) {
+        try {
+          const mainRect = containerRef.current.getBoundingClientRect()
+          const mainX = e.clientX - mainRect.left
+          if (mainX >= 0 && mainX <= mainRect.width) {
+            setMousePos({ x: mainX, y: 0 })
+          } else {
+            setMousePos(null)
+          }
+        } catch (e) {
+          // Ignore sync errors
+        }
+      }
+    }
+
+    const handleRsiMouseLeave = () => {
+      setRsiMousePos(null)
+    }
+
+    container.addEventListener('mousemove', handleRsiMouseMove)
+    container.addEventListener('mouseleave', handleRsiMouseLeave)
+
     return () => {
-      window.removeEventListener('resize', handleResize)
+      rsiResizeObserver.disconnect()
+      window.removeEventListener('resize', handleRsiWindowResize)
+      container.removeEventListener('mousemove', handleRsiMouseMove)
+      container.removeEventListener('mouseleave', handleRsiMouseLeave)
       if (rsiChartRef.current) {
         rsiChartRef.current.remove()
         rsiChartRef.current = null
@@ -497,6 +572,37 @@ export const PriceChart = () => {
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler)
     }
   }, [loadMoreBars])
+
+  // Sync time scale between main chart and RSI chart
+  useEffect(() => {
+    const mainChart = chartRef.current
+    const rsiChart = rsiChartRef.current
+    if (!mainChart || !rsiChart || !syncRsiChart) return
+
+    const syncTimeScale = () => {
+      try {
+        const visibleRange = mainChart.timeScale().getVisibleRange()
+        if (visibleRange) {
+          rsiChart.timeScale().setVisibleRange(visibleRange)
+        }
+      } catch (e) {
+        // Ignore sync errors
+      }
+    }
+
+    const handler = () => {
+      syncTimeScale()
+    }
+
+    mainChart.timeScale().subscribeVisibleTimeRangeChange(handler)
+    
+    // Initial sync
+    syncTimeScale()
+
+    return () => {
+      mainChart.timeScale().unsubscribeVisibleTimeRangeChange(handler)
+    }
+  }, [syncRsiChart, data])
 
   useEffect(() => {
     let cancelled = false
@@ -858,29 +964,6 @@ export const PriceChart = () => {
             {showIndicators ? ' · Custom indicators' : ''}{' '}
             {showVolume ? ' · Volume' : ''}
           </Typography>
-        </Box>
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 16,
-            right: 16,
-            pointerEvents: 'auto',
-          }}
-        >
-          <Tooltip title="Chart Settings">
-            <IconButton
-              onClick={() => setShowSettingsDialog(true)}
-              sx={{
-                color: '#e4e7ef',
-                backgroundColor: 'rgba(255,255,255,0.08)',
-                '&:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.12)',
-                },
-              }}
-            >
-              <SettingsIcon />
-            </IconButton>
-          </Tooltip>
         </Box>
         <ChartSettingsDialog />
       </Box>

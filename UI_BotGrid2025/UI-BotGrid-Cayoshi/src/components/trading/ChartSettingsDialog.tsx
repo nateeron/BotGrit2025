@@ -27,6 +27,8 @@ export const ChartSettingsDialog = () => {
     toggleIndicators,
     showVolume,
     toggleVolume,
+    syncRsiChart,
+    toggleSyncRsiChart,
   } = useTradingStore()
 
   return (
@@ -109,6 +111,29 @@ export const ChartSettingsDialog = () => {
                 <Switch
                   checked={showVolume}
                   onChange={toggleVolume}
+                  sx={{
+                    '& .MuiSwitch-switchBase.Mui-checked': {
+                      color: '#1976d2',
+                    },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                      backgroundColor: '#1976d2',
+                    },
+                  }}
+                />
+              </Box>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <Typography variant="body2" sx={{ color: '#e4e7ef' }}>
+                  Sync RSI Chart
+                </Typography>
+                <Switch
+                  checked={syncRsiChart}
+                  onChange={toggleSyncRsiChart}
                   sx={{
                     '& .MuiSwitch-switchBase.Mui-checked': {
                       color: '#1976d2',
