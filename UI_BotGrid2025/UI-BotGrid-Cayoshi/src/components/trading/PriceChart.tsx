@@ -46,6 +46,7 @@ import {
 } from '../../utils/indicatorMath'
 import ChartSettingsDialog from './ChartSettingsDialog'
 import { useChartDataStore } from './useChartData'
+import { useChartRefsStore } from './useChartRefsStore'
 
 type MainSeries = ISeriesApi<'Candlestick'> | ISeriesApi<'Area'>
 
@@ -196,7 +197,11 @@ export const PriceChart = () => {
     showVolume,
     fullscreenChart,
     toggleFullscreen,
+    syncRsiChart,
   } = useTradingStore()
+  
+  const setMainChartRef = useChartRefsStore((state) => state.setMainChartRef)
+  const setMainMousePos = useChartRefsStore((state) => state.setMainMousePos)
 
   const symbolPair = useMemo(
     () => `${selectedCoin}USDT`,
@@ -281,6 +286,9 @@ export const PriceChart = () => {
         secondsVisible: false,
       },
     })
+    
+    // Register chart ref for sync
+    setMainChartRef(chartRef.current)
 
     const updateChartSize = () => {
       if (!containerRef.current || !chartRef.current) return
@@ -310,8 +318,9 @@ export const PriceChart = () => {
       realtimeCleanupRef.current?.()
       chartRef.current?.remove()
       chartRef.current = null
+      setMainChartRef(null)
     }
-  }, [])
+  }, [setMainChartRef])
 
   useEffect(() => {
     const container = containerRef.current
@@ -322,10 +331,29 @@ export const PriceChart = () => {
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
       setMousePos({ x, y })
+      
+      // Sync mouse position to RSI chart if sync is enabled
+      if (syncRsiChart && chartRef.current) {
+        try {
+          // Verify that the coordinate is valid (within chart bounds)
+          const time = chartRef.current.timeScale().coordinateToTime(x)
+          if (time !== null) {
+            setMainMousePos({ x, y })
+          } else {
+            setMainMousePos(null)
+          }
+        } catch (e) {
+          // Ignore errors
+          setMainMousePos(null)
+        }
+      }
     }
 
     const handleMouseLeave = () => {
       setMousePos(null)
+      if (syncRsiChart) {
+        setMainMousePos(null)
+      }
     }
 
     container.addEventListener('mousemove', handleMouseMove)
@@ -335,7 +363,7 @@ export const PriceChart = () => {
       container.removeEventListener('mousemove', handleMouseMove)
       container.removeEventListener('mouseleave', handleMouseLeave)
     }
-  }, [data])
+  }, [data, syncRsiChart, setMainMousePos])
 
   useEffect(() => {
     if (!fullscreenChart) return
@@ -452,6 +480,39 @@ export const PriceChart = () => {
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler)
     }
   }, [loadMoreBars])
+
+  // Sync time scale between main chart and RSI chart
+  useEffect(() => {
+    const mainChart = chartRef.current
+    if (!mainChart || !syncRsiChart) return
+
+    const rsiChart = useChartRefsStore.getState().rsiChartRef
+    if (!rsiChart) return
+
+    const syncTimeScale = () => {
+      try {
+        const visibleRange = mainChart.timeScale().getVisibleRange()
+        if (visibleRange) {
+          rsiChart.timeScale().setVisibleRange(visibleRange)
+        }
+      } catch (e) {
+        // Ignore sync errors
+      }
+    }
+
+    const handler = () => {
+      syncTimeScale()
+    }
+
+    mainChart.timeScale().subscribeVisibleTimeRangeChange(handler)
+    
+    // Initial sync
+    syncTimeScale()
+
+    return () => {
+      mainChart.timeScale().unsubscribeVisibleTimeRangeChange(handler)
+    }
+  }, [syncRsiChart, data])
 
   useEffect(() => {
     let cancelled = false

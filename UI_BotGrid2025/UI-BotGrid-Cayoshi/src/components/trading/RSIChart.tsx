@@ -5,10 +5,14 @@ import type { IChartApi, ISeriesApi } from 'lightweight-charts'
 import { useTradingStore } from '../../store/tradingStore'
 import { calculateRSI } from '../../utils/indicatorMath'
 import { useChartDataStore } from './useChartData'
+import { useChartRefsStore } from './useChartRefsStore'
 
 export const RSIChart = () => {
   const chartData = useChartDataStore((state) => state.chartData)
   const { syncRsiChart } = useTradingStore()
+  const setRsiChartRef = useChartRefsStore((state) => state.setRsiChartRef)
+  const mainMousePos = useChartRefsStore((state) => state.mainMousePos)
+  const mainChartRef = useChartRefsStore((state) => state.mainChartRef)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const rsiSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
@@ -49,6 +53,9 @@ export const RSIChart = () => {
         mode: 0,
       },
     })
+    
+    // Register RSI chart ref for sync
+    setRsiChartRef(chartRef.current)
 
     const updateChartSize = () => {
       if (!containerRef.current || !chartRef.current) return
@@ -78,9 +85,10 @@ export const RSIChart = () => {
         chartRef.current.remove()
         chartRef.current = null
         rsiSeriesRef.current = null
+        setRsiChartRef(null)
       }
     }
-  }, [])
+  }, [setRsiChartRef])
 
   useEffect(() => {
     if (!chartRef.current || chartData.length === 0) return
@@ -102,12 +110,55 @@ export const RSIChart = () => {
 
     const rsiData = calculateRSI(normalized, 14)
     rsiSeriesRef.current.setData(rsiData)
-    chartRef.current.timeScale().fitContent()
-  }, [chartData])
+    
+    // Only fit content if sync is disabled, otherwise let main chart control
+    if (!syncRsiChart) {
+      chartRef.current.timeScale().fitContent()
+    }
+  }, [chartData, syncRsiChart])
+
+  // Sync cursor from main chart when sync is enabled
+  useEffect(() => {
+    if (!syncRsiChart || !chartRef.current || !mainChartRef) {
+      if (!syncRsiChart) {
+        setMousePos(null)
+      }
+      return
+    }
+
+    if (!mainMousePos) {
+      setMousePos(null)
+      return
+    }
+
+    try {
+      // Get time from main chart's mouse position
+      const time = mainChartRef.timeScale().coordinateToTime(mainMousePos.x)
+      if (time !== null) {
+        // Convert time to coordinate in RSI chart
+        const rsiX = chartRef.current.timeScale().timeToCoordinate(time)
+        if (rsiX !== null && rsiX >= 0) {
+          setMousePos({ x: rsiX, y: mainMousePos.y })
+        } else {
+          setMousePos(null)
+        }
+      } else {
+        setMousePos(null)
+      }
+    } catch (e) {
+      // Ignore errors
+      setMousePos(null)
+    }
+  }, [mainMousePos, syncRsiChart, mainChartRef])
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
+
+    // Only handle local mouse events if sync is disabled
+    if (syncRsiChart) {
+      return
+    }
 
     const handleMouseMove = (e: MouseEvent) => {
       const rect = container.getBoundingClientRect()
@@ -127,7 +178,7 @@ export const RSIChart = () => {
       container.removeEventListener('mousemove', handleMouseMove)
       container.removeEventListener('mouseleave', handleMouseLeave)
     }
-  }, [])
+  }, [syncRsiChart])
 
   return (
     <Box
