@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Box, CircularProgress, Typography } from '@mui/material'
+import {
+  Alert,
+  Box,
+  CircularProgress,
+  Typography,
+  IconButton,
+  Tooltip,
+} from '@mui/material'
+import SettingsIcon from '@mui/icons-material/Settings'
 import {
   AreaSeries,
   CandlestickSeries,
@@ -39,6 +47,7 @@ import {
   calculateRSI,
   calculateSMA,
 } from '../../utils/indicatorMath'
+import ChartSettingsDialog from './ChartSettingsDialog'
 
 type MainSeries = ISeriesApi<'Candlestick'> | ISeriesApi<'Area'>
 
@@ -189,6 +198,7 @@ export const PriceChart = () => {
     showVolume,
     fullscreenChart,
     toggleFullscreen,
+    setShowSettingsDialog,
   } = useTradingStore()
 
   const symbolPair = useMemo(
@@ -213,6 +223,7 @@ export const PriceChart = () => {
   const startTimestampRef = useRef<UTCTimestamp | null>(null)
   const loadingMoreRef = useRef(false)
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
+  const isInitialLoadRef = useRef(true)
 
   const indicatorConfigs = useTradingStore((state) => state.indicatorConfigs)
   const loadIndicatorConfigs = useTradingStore(
@@ -225,6 +236,8 @@ export const PriceChart = () => {
   const [markers, setMarkers] = useState<SeriesMarker<UTCTimestamp>[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null)
+  const [rsiMousePos, setRsiMousePos] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     loadIndicatorConfigs()
@@ -254,9 +267,7 @@ export const PriceChart = () => {
         horzLines: { color: 'rgba(255,255,255,0.04)' },
       },
       crosshair: {
-        mode: 1,
-        vertLine: { color: '#63c20b', width: 1, style: LineStyle.Solid },
-        horzLine: { color: '#63c20b', width: 1, style: LineStyle.Solid },
+        mode: 0,
       },
       rightPriceScale: {
         borderColor: 'rgba(255,255,255,0.08)',
@@ -286,6 +297,48 @@ export const PriceChart = () => {
   }, [])
 
   useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      setMousePos({ x, y })
+
+      // Sync to RSI chart - sync vertical line position
+      try {
+        const rsiContainer = document.getElementById('tv_rsi_container')
+        if (rsiContainer) {
+          const rsiRect = rsiContainer.getBoundingClientRect()
+          const rsiX = e.clientX - rsiRect.left
+          if (rsiX >= 0 && rsiX <= rsiRect.width) {
+            setRsiMousePos({ x: rsiX, y: 0 })
+          } else {
+            setRsiMousePos(null)
+          }
+        }
+      } catch (e) {
+        // Ignore sync errors
+      }
+    }
+
+    const handleMouseLeave = () => {
+      setMousePos(null)
+      setRsiMousePos(null)
+    }
+
+    container.addEventListener('mousemove', handleMouseMove)
+    container.addEventListener('mouseleave', handleMouseLeave)
+
+    return () => {
+      container.removeEventListener('mousemove', handleMouseMove)
+      container.removeEventListener('mouseleave', handleMouseLeave)
+    }
+  }, [data])
+
+
+  useEffect(() => {
     const container = document.getElementById('tv_rsi_container')
     if (!container) return
     if (rsiChartRef.current) {
@@ -310,6 +363,9 @@ export const PriceChart = () => {
       timeScale: {
         borderColor: 'rgba(255,255,255,0.08)',
       },
+      crosshair: {
+        mode: 0,
+      },
     })
     const handleResize = () => {
       if (!container || !rsiChartRef.current) return
@@ -326,6 +382,7 @@ export const PriceChart = () => {
       }
     }
   }, [fullscreenChart])
+
 
   useEffect(() => {
     if (!fullscreenChart) return
@@ -447,6 +504,8 @@ export const PriceChart = () => {
       setLoading(true)
       setError(null)
       realtimeCleanupRef.current?.()
+      // Reset initial load flag when symbol or interval changes
+      isInitialLoadRef.current = true
       try {
         const candles = sanitizeSeries(
           await fetchChartBootstrap({
@@ -580,7 +639,12 @@ export const PriceChart = () => {
       volumeSeriesRef.current = histogram
     }
 
-    chart.timeScale().fitContent()
+    // Only fit content on initial load, not on every data update
+    const shouldFitContent = isInitialLoadRef.current
+    if (shouldFitContent) {
+      chart.timeScale().fitContent()
+      isInitialLoadRef.current = false
+    }
 
     if (rsiChartRef.current) {
       if (!rsiSeriesRef.current) {
@@ -591,7 +655,10 @@ export const PriceChart = () => {
       }
       const rsiData = calculateRSI(normalized, 14)
       rsiSeriesRef.current.setData(rsiData)
-      rsiChartRef.current.timeScale().fitContent()
+      // Only fit RSI chart on initial load
+      if (shouldFitContent) {
+        rsiChartRef.current.timeScale().fitContent()
+      }
     }
   }, [chartMode, data, indicatorConfigs, markers, showIndicators, showVolume])
 
@@ -737,8 +804,41 @@ export const PriceChart = () => {
           sx={{
             width: '100%',
             height: '100%',
+            position: 'relative',
           }}
         />
+        {mousePos && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              zIndex: 10,
+            }}
+          >
+            <svg
+              style={{
+                width: '100%',
+                height: '100%',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+              }}
+            >
+              <line
+                x1={mousePos.x}
+                y1="0"
+                x2={mousePos.x}
+                y2="100%"
+                stroke="#b0b0b0"
+                strokeWidth="1"
+              />
+            </svg>
+          </Box>
+        )}
         <Box
           sx={{
             position: 'absolute',
@@ -759,6 +859,30 @@ export const PriceChart = () => {
             {showVolume ? ' · Volume' : ''}
           </Typography>
         </Box>
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            pointerEvents: 'auto',
+          }}
+        >
+          <Tooltip title="Chart Settings">
+            <IconButton
+              onClick={() => setShowSettingsDialog(true)}
+              sx={{
+                color: '#e4e7ef',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.12)',
+                },
+              }}
+            >
+              <SettingsIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <ChartSettingsDialog />
       </Box>
       <Box
         sx={{
@@ -771,7 +895,41 @@ export const PriceChart = () => {
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
           RSI (14)
         </Typography>
-        <Box id="tv_rsi_container" sx={{ width: '100%', height: 140 }} />
+        <Box sx={{ position: 'relative', width: '100%', height: 140 }}>
+          <Box id="tv_rsi_container" sx={{ width: '100%', height: '100%' }} />
+          {rsiMousePos && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+                zIndex: 10,
+              }}
+            >
+              <svg
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                }}
+              >
+                <line
+                  x1={rsiMousePos.x}
+                  y1="0"
+                  x2={rsiMousePos.x}
+                  y2="100%"
+                  stroke="#b0b0b0"
+                  strokeWidth="1"
+                />
+              </svg>
+            </Box>
+          )}
+        </Box>
       </Box>
     </Box>
   )

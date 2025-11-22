@@ -34,6 +34,8 @@ interface TradingState {
   showIndicators: boolean
   showVolume: boolean
   fullscreenChart: boolean
+  sidebarCollapsed: boolean
+  showSettingsDialog: boolean
   indicatorConfigs: IndicatorConfig[]
   tvStudies: StudyConfig[]
   priceLevels: PriceLevel[]
@@ -43,6 +45,8 @@ interface TradingState {
   toggleIndicators: () => void
   toggleVolume: () => void
   toggleFullscreen: () => void
+  toggleSidebar: () => void
+  setShowSettingsDialog: (show: boolean) => void
   loadIndicatorConfigs: () => void
   addIndicatorConfig: (config: IndicatorConfig) => void
   updateIndicatorConfig: (config: IndicatorConfig) => void
@@ -118,6 +122,8 @@ export const useTradingStore = create<TradingState>((set, get) => ({
   showIndicators: true,
   showVolume: true,
   fullscreenChart: false,
+  sidebarCollapsed: false,
+  showSettingsDialog: false,
   indicatorConfigs: [],
   tvStudies: [],
   priceLevels: [],
@@ -129,6 +135,9 @@ export const useTradingStore = create<TradingState>((set, get) => ({
   toggleVolume: () => set((state) => ({ showVolume: !state.showVolume })),
   toggleFullscreen: () =>
     set((state) => ({ fullscreenChart: !state.fullscreenChart })),
+  toggleSidebar: () =>
+    set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  setShowSettingsDialog: (show) => set({ showSettingsDialog: show }),
   loadIndicatorConfigs: () => {
     const configs = readIndicatorsFromSession()
     set({ indicatorConfigs: configs })

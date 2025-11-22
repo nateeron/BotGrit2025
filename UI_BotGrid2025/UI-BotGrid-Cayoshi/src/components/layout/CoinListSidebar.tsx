@@ -11,9 +11,11 @@ import {
   ListItemText,
   TextField,
   Typography,
+  Tooltip,
 } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import type { CoinSummary } from '../../services/api'
 import { getCoins } from '../../services/api'
 import { useTradingStore } from '../../store/tradingStore'
@@ -26,6 +28,7 @@ export const CoinListSidebar = () => {
   const [query, setQuery] = useState('')
   const selectedCoin = useTradingStore((state) => state.selectedCoin)
   const setSelectedCoin = useTradingStore((state) => state.setSelectedCoin)
+  const toggleSidebar = useTradingStore((state) => state.toggleSidebar)
 
   const fetchCoins = async () => {
     setLoading(true)
@@ -76,6 +79,11 @@ export const CoinListSidebar = () => {
         <IconButton onClick={fetchCoins} disabled={loading}>
           <RefreshIcon fontSize="small" />
         </IconButton>
+        <Tooltip title="Hide Symbol List">
+          <IconButton onClick={toggleSidebar} size="small">
+            <ChevronRightIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </Box>
 
       {loading && (
