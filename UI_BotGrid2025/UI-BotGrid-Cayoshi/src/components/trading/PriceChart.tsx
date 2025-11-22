@@ -319,6 +319,9 @@ export const PriceChart = () => {
     fullscreenChart,
     toggleFullscreen,
     syncRsiChart,
+    showPlotLine,
+    showBacktest,
+    showBuySellLines,
   } = useTradingStore()
   
   const setMainChartRef = useChartRefsStore((state) => state.setMainChartRef)
@@ -340,6 +343,7 @@ export const PriceChart = () => {
   const mainSeriesRef = useRef<MainSeries | null>(null)
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const indicatorSeriesRef = useRef<Record<string, ISeriesApi<'Line'>[]>>({})
+  const plotLineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
   const tradePriceLineRefs = useRef<Record<string, PriceLineInstance>>({})
   const tradePriceLevelsRef = useRef<TradePriceLevel[]>([]) // Store price levels in ref
   const tradeMarkersRef = useRef<SeriesMarker<UTCTimestamp>[]>([]) // Store markers in ref
@@ -361,7 +365,6 @@ export const PriceChart = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null)
-  const showBuySellLines = useTradingStore((state) => state.showBuySellLines)
   const setReloadBacktestData = useTradingStore((state) => state.setReloadBacktestData)
 
   // Count Buy and Sell trades
@@ -535,6 +538,36 @@ export const PriceChart = () => {
 
   const loadTradePriceLines = useCallback(
     async (startTime: UTCTimestamp | null) => {
+      // Check if backtest is enabled
+      if (!showBacktest) {
+        // Clear existing data if backtest is disabled
+        tradePriceLevelsRef.current = []
+        tradeMarkersRef.current = []
+        setTradePriceLevels([])
+        setTrades([])
+        
+        // Clear price lines
+        if (mainSeriesRef.current) {
+          Object.values(tradePriceLineRefs.current).forEach((line) => {
+            try {
+              mainSeriesRef.current?.removePriceLine(line)
+            } catch {
+              /* noop */
+            }
+          })
+          tradePriceLineRefs.current = {}
+        }
+        
+        // Clear markers
+        if (mainSeriesRef.current && mainSeriesRef.current.seriesType() === 'Candlestick') {
+          const series = mainSeriesRef.current as any
+          if (typeof series.setMarkers === 'function') {
+            series.setMarkers([])
+          }
+        }
+        return
+      }
+      
       if (!startTime) {
         console.log('loadTradePriceLines - No startTime, clearing price levels')
         tradePriceLevelsRef.current = [] // Clear ref
@@ -621,7 +654,7 @@ export const PriceChart = () => {
         }
       }
     },
-    [interval, symbolPair],
+    [interval, symbolPair, showBacktest],
   )
 
   const handleReloadBacktest = useCallback(() => {
@@ -638,6 +671,40 @@ export const PriceChart = () => {
       setReloadBacktestData(null)
     }
   }, [handleReloadBacktest, setReloadBacktestData])
+
+  // Effect to clear backtest data when showBacktest is disabled
+  useEffect(() => {
+    if (!showBacktest) {
+      // Clear backtest data
+      tradePriceLevelsRef.current = []
+      tradeMarkersRef.current = []
+      setTradePriceLevels([])
+      setTrades([])
+      
+      // Clear price lines
+      if (mainSeriesRef.current) {
+        Object.values(tradePriceLineRefs.current).forEach((line) => {
+          try {
+            mainSeriesRef.current?.removePriceLine(line)
+          } catch {
+            /* noop */
+          }
+        })
+        tradePriceLineRefs.current = {}
+        
+        // Clear markers
+        if (mainSeriesRef.current.seriesType() === 'Candlestick') {
+          const series = mainSeriesRef.current as any
+          if (typeof series.setMarkers === 'function') {
+            series.setMarkers([])
+          }
+        }
+      }
+    } else if (showBacktest && startTimestampRef.current && data.length > 0) {
+      // Reload backtest data if it's enabled and we have data
+      loadTradePriceLines(startTimestampRef.current)
+    }
+  }, [showBacktest, loadTradePriceLines, data.length])
 
   const loadMoreBars = useCallback(async () => {
     if (loadingMoreRef.current) return
@@ -769,8 +836,10 @@ export const PriceChart = () => {
         startTimestampRef.current = candles[0]?.time ?? null
         setData(candles)
         setChartData(candles) // Share data with RSI chart
-        // Load trade markers after data is set (this will update markers using current data)
-        await loadTradePriceLines(candles[0]?.time ?? null)
+        // Load trade markers after data is set (only if backtest is enabled)
+        if (showBacktest) {
+          await loadTradePriceLines(candles[0]?.time ?? null)
+        }
         realtimeCleanupRef.current = subscribeBinanceKlines(
           symbolPair,
           interval,
@@ -790,7 +859,7 @@ export const PriceChart = () => {
     return () => {
       cancelled = true
     }
-  }, [handleRealtimeCandle, interval, loadTradePriceLines, symbolPair])
+  }, [handleRealtimeCandle, interval, loadTradePriceLines, symbolPair, showBacktest])
 
   // Separate effect for updating series data (without recreating series)
   useEffect(() => {
@@ -872,6 +941,10 @@ export const PriceChart = () => {
       if (volumeSeriesRef.current) {
         chart.removeSeries(volumeSeriesRef.current)
         volumeSeriesRef.current = null
+      }
+      if (plotLineSeriesRef.current) {
+        chart.removeSeries(plotLineSeriesRef.current)
+        plotLineSeriesRef.current = null
       }
 
       // Create new series
@@ -969,6 +1042,32 @@ export const PriceChart = () => {
     }
   }, [chartMode, indicatorConfigs, showIndicators, showVolume, data.length]) // Add data.length to detect when data is loaded
 
+  // Effect for plot line series
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart || !mainSeriesRef.current) return
+
+    // Remove existing plot line if exists
+    if (plotLineSeriesRef.current) {
+      chart.removeSeries(plotLineSeriesRef.current)
+      plotLineSeriesRef.current = null
+    }
+
+    // Create plot line if enabled
+    if (showPlotLine) {
+      const lineSeries = chart.addSeries(LineSeries, {
+        color: '#2962FF',
+        lineWidth: 2,
+      }) as ISeriesApi<'Line'>
+      lineSeries.setData([
+        { time: { year: 2025, month: 11, day: 22 }, value: 1.531816900940186 },
+        { time: { year: 2025, month: 11, day: 23 }, value: 1.350850429478125 },
+        { time: { year: 2025, month: 11, day: 24 }, value: 1.05218443850655 },
+      ])
+      plotLineSeriesRef.current = lineSeries
+    }
+  }, [showPlotLine])
+
 
   // Create price lines and markers for trades
   useEffect(() => {
@@ -1055,7 +1154,7 @@ export const PriceChart = () => {
     } catch (error) {
       console.error('Failed to set markers:', error)
     }
-  }, [chartMode, tradePriceLevels, showBuySellLines])
+  }, [chartMode, tradePriceLevels, showBuySellLines, showBacktest])
 
   useEffect(() => {
     const height = fullscreenChart ? 520 : 380
