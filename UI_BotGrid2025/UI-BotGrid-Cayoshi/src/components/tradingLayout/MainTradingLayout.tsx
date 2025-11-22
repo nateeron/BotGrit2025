@@ -23,9 +23,15 @@ export const MainTradingLayout = () => {
   const handleHorizontalResize = (delta: number) => {
     if (!containerRef.current) return
     const containerWidth = containerRef.current.offsetWidth
+    const MIN_RIGHT_WIDTH = 300 // Minimum width for List Coin in pixels
+    const maxLeftWidthPercent = ((containerWidth - MIN_RIGHT_WIDTH) / containerWidth) * 100
+    
     const deltaPercent = (delta / containerWidth) * 100
     const newLeftWidth = leftWidth + deltaPercent
-    setLeftWidth(newLeftWidth)
+    
+    // Clamp to ensure right panel is at least MIN_RIGHT_WIDTH
+    const clampedWidth = Math.max(30, Math.min(maxLeftWidthPercent, newLeftWidth))
+    setLeftWidth(clampedWidth)
   }
 
   // Handle vertical resize (top/bottom)
@@ -123,6 +129,7 @@ export const MainTradingLayout = () => {
         sx={{
           width: `${100 - leftWidth}%`,
           maxWidth: '300px',
+          minWidth: '300px',
           height: '100%',
           display: 'flex',
           flexDirection: 'column',

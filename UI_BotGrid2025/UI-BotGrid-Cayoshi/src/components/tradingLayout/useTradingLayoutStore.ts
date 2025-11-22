@@ -21,6 +21,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>((set, get) => ({
   topHeight: DEFAULT_TOP_HEIGHT,
 
   setLeftWidth: (width: number) => {
+    // Clamp between 30% and 95% (will be further constrained by container width in MainTradingLayout)
     const clamped = Math.max(30, Math.min(95, width))
     set({ leftWidth: clamped })
     sessionStorage.setItem(STORAGE_KEYS.LEFT_WIDTH, clamped.toString())

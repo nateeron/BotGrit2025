@@ -15,6 +15,7 @@ import {
   Typography,
   Divider,
 } from '@mui/material'
+import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import { useTradingStore } from '../../store/tradingStore'
 
 export const ChartSettingsDialog = () => {
@@ -29,7 +30,15 @@ export const ChartSettingsDialog = () => {
     toggleVolume,
     syncRsiChart,
     toggleSyncRsiChart,
+    resetToDefaults,
   } = useTradingStore()
+
+  const handleResetDefaults = () => {
+    if (window.confirm('Are you sure you want to reset all settings to default?')) {
+      resetToDefaults()
+      setShowSettingsDialog(false)
+    }
+  }
 
   return (
     <Dialog
@@ -149,6 +158,14 @@ export const ChartSettingsDialog = () => {
         </Box>
       </DialogContent>
       <DialogActions>
+        <Button
+          onClick={handleResetDefaults}
+          startIcon={<RestartAltIcon />}
+          color="warning"
+          sx={{ color: '#ff9800' }}
+        >
+          Reset Defaults
+        </Button>
         <Button
           onClick={() => setShowSettingsDialog(false)}
           sx={{ color: '#e4e7ef' }}
