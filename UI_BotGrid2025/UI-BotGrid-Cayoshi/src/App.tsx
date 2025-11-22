@@ -62,8 +62,10 @@ const App = () => {
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
       <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0d1117' }}>
-        <LeftMenuMini />
-        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+          <LeftMenuMini />
+        </Box>
+        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', width: { xs: '100%', md: 'auto' } }}>
           <AppBar
             position="sticky"
             elevation={0}
@@ -73,12 +75,29 @@ const App = () => {
               borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}
           >
-            <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Box>
-                <Typography variant="h6" fontWeight={600}>
+            <Toolbar 
+              sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                gap: { xs: 1, sm: 0 },
+                minHeight: { xs: 64, sm: 64 },
+                py: { xs: 1, sm: 0 },
+              }}
+            >
+              <Box sx={{ flexShrink: 0 }}>
+                <Typography 
+                  variant="h6" 
+                  fontWeight={600}
+                  sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+                >
                   BotGrid Pro
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography 
+                  variant="caption" 
+                  color="text.secondary"
+                  sx={{ display: { xs: 'none', sm: 'block' } }}
+                >
                   React + MUI Trading Workbench
                 </Typography>
               </Box>
@@ -87,6 +106,14 @@ const App = () => {
                 onChange={(_, value) => setActiveTab(value)}
                 textColor="inherit"
                 indicatorColor="primary"
+                sx={{ 
+                  minHeight: { xs: 40, sm: 48 },
+                  '& .MuiTab-root': {
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    minWidth: { xs: 60, sm: 72 },
+                    padding: { xs: '8px 12px', sm: '12px 16px' },
+                  },
+                }}
               >
                 <Tab label="Trading" value="trading" />
                 <Tab label="Report" value="report" />

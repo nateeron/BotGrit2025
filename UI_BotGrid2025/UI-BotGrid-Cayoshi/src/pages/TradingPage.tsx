@@ -14,11 +14,17 @@ export const TradingPage = () => {
   const toggleSidebar = useTradingStore((state) => state.toggleSidebar)
 
   return (
-    <Box sx={{ width: '100%', px: { xs: 2, md: 3 }, py: 3 }}>
-      <Typography variant="h4" sx={{ mb: 3 }}>
+    <Box sx={{ width: '100%', px: { xs: 1, sm: 2, md: 3 }, py: { xs: 2, md: 3 } }}>
+      <Typography 
+        variant="h4" 
+        sx={{ 
+          mb: { xs: 2, md: 3 },
+          fontSize: { xs: '1.5rem', sm: '2rem' },
+        }}
+      >
         Trading Dashboard
       </Typography>
-      <Grid container spacing={3}>
+      <Grid container spacing={{ xs: 2, md: 3 }}>
         <Grid size={12}>
           <TopChartToolbar />
         </Grid>
@@ -30,10 +36,11 @@ export const TradingPage = () => {
               <Tooltip title="Show Symbol List">
                 <IconButton
                   onClick={toggleSidebar}
+                  size="small"
                   sx={{
                     position: 'absolute',
-                    top: 16,
-                    right: 16,
+                    top: { xs: 8, md: 16 },
+                    right: { xs: 8, md: 16 },
                     zIndex: 20,
                     backgroundColor: 'rgba(255,255,255,0.08)',
                     color: '#e4e7ef',
@@ -42,7 +49,7 @@ export const TradingPage = () => {
                     },
                   }}
                 >
-                  <ChevronLeftIcon />
+                  <ChevronLeftIcon sx={{ fontSize: { xs: 20, md: 24 } }} />
                 </IconButton>
               </Tooltip>
             )}

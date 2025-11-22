@@ -847,8 +847,8 @@ export const PriceChart = () => {
     : {
         position: 'relative' as const,
         flexGrow: 1,
-        minHeight: 380,
-        borderRadius: 3,
+        minHeight: { xs: 250, sm: 300, md: 380 },
+        borderRadius: { xs: 2, md: 3 },
         overflow: 'hidden',
         backgroundColor: 'rgba(255,255,255,0.02)',
       }
@@ -948,18 +948,30 @@ export const PriceChart = () => {
         <Box
           sx={{
             position: 'absolute',
-            top: 16,
-            left: 16,
+            top: { xs: 8, md: 16 },
+            left: { xs: 8, md: 16 },
             display: 'flex',
             flexDirection: 'column',
             gap: 0.5,
             pointerEvents: 'none',
           }}
         >
-          <Typography variant="h6">
+          <Typography 
+            variant="h6"
+            sx={{ 
+              fontSize: { xs: '0.875rem', sm: '1rem', md: '1.25rem' },
+            }}
+          >
             {selectedCoin}/USDT · {interval.toUpperCase()}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography 
+            variant="caption" 
+            color="text.secondary"
+            sx={{ 
+              fontSize: { xs: '0.65rem', sm: '0.75rem' },
+              display: { xs: 'none', sm: 'block' },
+            }}
+          >
             {chartMode === 'candle' ? 'Candlestick' : 'Line'} Mode
             {showIndicators ? ' · Custom indicators' : ''}{' '}
             {showVolume ? ' · Volume' : ''}
@@ -969,16 +981,23 @@ export const PriceChart = () => {
       </Box>
       <Box
         sx={{
-          borderRadius: 3,
+          borderRadius: { xs: 2, md: 3 },
           backgroundColor: 'rgba(255,255,255,0.02)',
-          p: 1,
-          minHeight: 160,
+          p: { xs: 0.75, md: 1 },
+          minHeight: { xs: 120, sm: 140, md: 160 },
         }}
       >
-        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+        <Typography 
+          variant="subtitle2" 
+          sx={{ 
+            mb: { xs: 0.5, md: 1 },
+            fontSize: { xs: '0.75rem', sm: '0.875rem' },
+            px: { xs: 1, md: 0 },
+          }}
+        >
           RSI (14)
         </Typography>
-        <Box sx={{ position: 'relative', width: '100%', height: 140 }}>
+        <Box sx={{ position: 'relative', width: '100%', height: { xs: 100, sm: 120, md: 140 } }}>
           <Box id="tv_rsi_container" sx={{ width: '100%', height: '100%' }} />
           {rsiMousePos && (
             <Box
