@@ -22,6 +22,7 @@ import type {
   ISeriesApi,
   LineData,
   LineSeriesPartialOptions,
+  SeriesMarker,
   UTCTimestamp,
 } from 'lightweight-charts'
 import {
@@ -150,30 +151,39 @@ const intervalToSeconds = (interval: string) => {
   return (multipliers[unit] ?? 60) * value
 }
 
-interface TradePriceLine {
+interface TradePriceLevel {
   id: string
   price: number
   color: string
   label: string
+  startTime: UTCTimestamp
+  marker?: SeriesMarker<UTCTimestamp>
 }
 
-const convertTradesToPriceLines = (
+const convertTradesToPriceLevels = (
   trades: BacktestTrade[],
-): TradePriceLine[] => {
-  const priceLines: TradePriceLine[] = []
-  const priceCounts = new Map<number, { buy: number; sell: number }>()
-
-  console.log('convertTradesToPriceLines - Total trades:', trades.length)
+  data: OhlcPoint[],
+): TradePriceLevel[] => {
+  const priceLevels: TradePriceLevel[] = []
   
-  if (trades.length === 0) {
-    console.warn('convertTradesToPriceLines - No trades data')
-    return priceLines
+  console.log('convertTradesToPriceLevels - Total trades:', trades.length, 'Data points:', data.length)
+  
+  if (trades.length === 0 || data.length === 0) {
+    console.warn('convertTradesToPriceLevels - No trades or data')
+    return priceLevels
   }
+
+  // Create a map of timestamps to data points for quick lookup
+  const dataMap = new Map<UTCTimestamp, OhlcPoint>()
+  data.forEach((point) => {
+    dataMap.set(point.time, point)
+  })
 
   trades.forEach((trade, index) => {
     // Debug first few trades
     if (index < 3) {
       console.log(`Trade ${index}:`, {
+        timestem_buy: trade.timestem_buy,
         priceAction: trade.priceAction,
         priceSell: trade.priceSell,
         timestem_sell: trade.timestem_sell,
@@ -181,67 +191,122 @@ const convertTradesToPriceLines = (
       })
     }
 
-    const buyPrice = Number(trade.priceAction)
+    // Convert buy timestamp to UTCTimestamp
+    // timestem_buy is in milliseconds, need to convert to seconds for UTCTimestamp
+    const buyTimestamp = Math.floor(trade.timestem_buy / 1000) as UTCTimestamp
     
-    if (isNaN(buyPrice) || buyPrice <= 0) {
-      console.warn(`Invalid buy price for trade ${index}:`, trade.priceAction)
-      return
-    }
+    // Find the closest data point for buy action
+    let buyTime: UTCTimestamp | null = null
+    let buyPoint: OhlcPoint | null = null
     
-    if (!priceCounts.has(buyPrice)) {
-      priceCounts.set(buyPrice, { buy: 0, sell: 0 })
+    // Try exact match first
+    if (dataMap.has(buyTimestamp)) {
+      buyTime = buyTimestamp
+      buyPoint = dataMap.get(buyTimestamp)!
+    } else {
+      // Find closest timestamp
+      let closestDiff = Infinity
+      let closestTime: UTCTimestamp | null = null
+      data.forEach((point) => {
+        const diff = Math.abs(Number(point.time) - buyTimestamp)
+        if (diff < closestDiff) {
+          closestDiff = diff
+          closestTime = point.time
+          buyPoint = point
+        }
+      })
+      buyTime = closestTime
     }
-    const counts = priceCounts.get(buyPrice)!
-    counts.buy++
 
-    // Check for sell: 
-    // - timestem_sell exists and is not null/0, OR
-    // - status indicates sold (status !== 0), OR  
-    // - priceSell exists and is valid
+    if (buyTime && buyPoint) {
+      const buyPrice = Number(trade.priceAction)
+      if (!isNaN(buyPrice) && buyPrice > 0) {
+        // Determine position based on price vs bar
+        const position: 'aboveBar' | 'belowBar' | 'inBar' = 
+          buyPrice > buyPoint.high ? 'aboveBar' :
+          buyPrice < buyPoint.low ? 'belowBar' : 'inBar'
+        
+        priceLevels.push({
+          id: `buy-${trade.timestem_buy}-${buyPrice}`,
+          price: buyPrice,
+          color: '#4A9FE6',
+          label: `Buy @ ${buyPrice.toFixed(4)}`,
+          startTime: buyTime,
+          marker: {
+            time: buyTime,
+            position,
+            color: '#4A9FE6',
+            shape: 'circle',
+            text: `Buy @ ${buyPrice.toFixed(4)}`,
+            size: 2, // Large marker at start point
+          },
+        })
+      }
+    }
+
+    // Add sell price level if exists
     const hasSell = (trade.timestem_sell != null && trade.timestem_sell !== 0) ||
                     (trade.status !== 0 && trade.status !== null) ||
                     (trade.priceSell != null && Number(trade.priceSell) > 0)
     
-    if (hasSell) {
-      const sellPrice = Number(trade.priceSell)
-      if (!isNaN(sellPrice) && sellPrice > 0) {
-        if (!priceCounts.has(sellPrice)) {
-          priceCounts.set(sellPrice, { buy: 0, sell: 0 })
-        }
-        const sellCounts = priceCounts.get(sellPrice)!
-        sellCounts.sell++
+    if (hasSell && trade.timestem_sell) {
+      const sellTimestamp = Math.floor(trade.timestem_sell / 1000) as UTCTimestamp
+      
+      // Find the closest data point for sell action
+      let sellTime: UTCTimestamp | null = null
+      let sellPoint: OhlcPoint | null = null
+      
+      if (dataMap.has(sellTimestamp)) {
+        sellTime = sellTimestamp
+        sellPoint = dataMap.get(sellTimestamp)!
       } else {
-        console.warn(`Invalid sell price for trade ${index}:`, trade.priceSell)
+        let closestDiff = Infinity
+        let closestTime: UTCTimestamp | null = null
+        data.forEach((point) => {
+          const diff = Math.abs(Number(point.time) - sellTimestamp)
+          if (diff < closestDiff) {
+            closestDiff = diff
+            closestTime = point.time
+            sellPoint = point
+          }
+        })
+        sellTime = closestTime
+      }
+
+      if (sellTime && sellPoint) {
+        const sellPrice = Number(trade.priceSell)
+        if (!isNaN(sellPrice) && sellPrice > 0) {
+          const position: 'aboveBar' | 'belowBar' | 'inBar' = 
+            sellPrice > sellPoint.high ? 'aboveBar' :
+            sellPrice < sellPoint.low ? 'belowBar' : 'inBar'
+          
+          priceLevels.push({
+            id: `sell-${trade.timestem_sell}-${sellPrice}`,
+            price: sellPrice,
+            color: '#DA46EE',
+            label: `Sell @ ${sellPrice.toFixed(4)}`,
+            startTime: sellTime,
+            marker: {
+              time: sellTime,
+              position,
+              color: '#DA46EE',
+              shape: 'circle',
+              text: `Sell @ ${sellPrice.toFixed(4)}`,
+              size: 2, // Large marker at start point
+            },
+          })
+        }
       }
     }
   })
 
-  priceCounts.forEach((counts, price) => {
-    if (counts.buy > 0) {
-      priceLines.push({
-        id: `buy-${price}`,
-        price,
-        color: '#4A9FE6',
-        label: `Buy ${counts.buy > 1 ? `x${counts.buy}` : ''} @ ${price.toFixed(4)}`,
-      })
-    }
-    if (counts.sell > 0) {
-      priceLines.push({
-        id: `sell-${price}`,
-        price,
-        color: '#DA46EE',
-        label: `Sell ${counts.sell > 1 ? `x${counts.sell}` : ''} @ ${price.toFixed(4)}`,
-      })
-    }
+  console.log('convertTradesToPriceLevels - Created price levels:', {
+    total: priceLevels.length,
+    buy: priceLevels.filter(p => p.color === '#4A9FE6').length,
+    sell: priceLevels.filter(p => p.color === '#DA46EE').length,
   })
 
-  console.log('convertTradesToPriceLines - Created price lines:', {
-    total: priceLines.length,
-    buy: priceLines.filter(p => p.color === '#4A9FE6').length,
-    sell: priceLines.filter(p => p.color === '#DA46EE').length,
-  })
-
-  return priceLines
+  return priceLevels
 }
 
 export const PriceChart = () => {
@@ -276,7 +341,8 @@ export const PriceChart = () => {
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const indicatorSeriesRef = useRef<Record<string, ISeriesApi<'Line'>[]>>({})
   const tradePriceLineRefs = useRef<Record<string, PriceLineInstance>>({})
-  const tradePriceLinesRef = useRef<TradePriceLine[]>([]) // Store price lines in ref
+  const tradePriceLevelsRef = useRef<TradePriceLevel[]>([]) // Store price levels in ref
+  const tradeMarkersRef = useRef<SeriesMarker<UTCTimestamp>[]>([]) // Store markers in ref
   const realtimeCleanupRef = useRef<() => void>(() => {})
   const dataRef = useRef<OhlcPoint[]>([])
   const startTimestampRef = useRef<UTCTimestamp | null>(null)
@@ -290,8 +356,8 @@ export const PriceChart = () => {
   const setChartData = useChartDataStore((state) => state.setChartData)
 
   const [data, setData] = useState<OhlcPoint[]>([])
-  const [tradePriceLines, setTradePriceLines] = useState<TradePriceLine[]>([])
   const [trades, setTrades] = useState<BacktestTrade[]>([])
+  const [tradePriceLevels, setTradePriceLevels] = useState<TradePriceLevel[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null)
@@ -470,10 +536,31 @@ export const PriceChart = () => {
   const loadTradePriceLines = useCallback(
     async (startTime: UTCTimestamp | null) => {
       if (!startTime) {
-        console.log('loadTradePriceLines - No startTime, clearing price lines')
-        tradePriceLinesRef.current = [] // Clear ref
-        setTradePriceLines([])
+        console.log('loadTradePriceLines - No startTime, clearing price levels')
+        tradePriceLevelsRef.current = [] // Clear ref
+        tradeMarkersRef.current = [] // Clear ref
+        setTradePriceLevels([])
         setTrades([])
+        
+        // Clear price lines
+        if (mainSeriesRef.current) {
+          Object.values(tradePriceLineRefs.current).forEach((line) => {
+            try {
+              mainSeriesRef.current?.removePriceLine(line)
+            } catch {
+              /* noop */
+            }
+          })
+          tradePriceLineRefs.current = {}
+        }
+        
+        // Clear markers on series if it exists
+        if (mainSeriesRef.current && mainSeriesRef.current.seriesType() === 'Candlestick') {
+          const series = mainSeriesRef.current as any
+          if (typeof series.setMarkers === 'function') {
+            series.setMarkers([])
+          }
+        }
         return
       }
       try {
@@ -490,15 +577,48 @@ export const PriceChart = () => {
         })
         console.log('loadTradePriceLines - Received trades:', tradesData.length)
         setTrades(tradesData)
-        const priceLines = convertTradesToPriceLines(tradesData)
-        console.log('loadTradePriceLines - Setting price lines:', priceLines.length)
-        tradePriceLinesRef.current = priceLines // Store in ref
-        setTradePriceLines(priceLines)
+        // Convert trades to price levels using current data
+        // Wait a bit to ensure dataRef.current is updated
+        const currentData = dataRef.current.length > 0 ? dataRef.current : []
+        const priceLevels = convertTradesToPriceLevels(tradesData, currentData)
+        console.log('loadTradePriceLines - Setting price levels:', priceLevels.length, 'from data points:', currentData.length)
+        tradePriceLevelsRef.current = priceLevels // Store in ref
+        setTradePriceLevels(priceLevels)
+        
+        // Extract markers for series
+        const markers = priceLevels
+          .filter(level => level.marker)
+          .map(level => level.marker!)
+        tradeMarkersRef.current = markers
+        
+        // Price lines and markers will be created by the useEffect hook
+        // No need to set them here as the effect will handle it
       } catch (error) {
         console.error('loadTradePriceLines error', error)
-        tradePriceLinesRef.current = [] // Clear ref
+        tradePriceLevelsRef.current = [] // Clear ref
+        tradeMarkersRef.current = [] // Clear ref
         setTrades([])
-        setTradePriceLines([])
+        setTradePriceLevels([])
+        
+        // Clear price lines
+        if (mainSeriesRef.current) {
+          Object.values(tradePriceLineRefs.current).forEach((line) => {
+            try {
+              mainSeriesRef.current?.removePriceLine(line)
+            } catch {
+              /* noop */
+            }
+          })
+          tradePriceLineRefs.current = {}
+        }
+        
+        // Clear markers on series if it exists
+        if (mainSeriesRef.current && mainSeriesRef.current.seriesType() === 'Candlestick') {
+          const series = mainSeriesRef.current as any
+          if (typeof series.setMarkers === 'function') {
+            series.setMarkers([])
+          }
+        }
       }
     },
     [interval, symbolPair],
@@ -649,6 +769,7 @@ export const PriceChart = () => {
         startTimestampRef.current = candles[0]?.time ?? null
         setData(candles)
         setChartData(candles) // Share data with RSI chart
+        // Load trade markers after data is set (this will update markers using current data)
         await loadTradePriceLines(candles[0]?.time ?? null)
         realtimeCleanupRef.current = subscribeBinanceKlines(
           symbolPair,
@@ -762,51 +883,22 @@ export const PriceChart = () => {
           wickDownColor: '#ef5350',
           borderVisible: false,
         }
-        const series = chart.addSeries(
-          CandlestickSeries,
-          options,
-        ) as ISeriesApi<'Candlestick'>
+        // Try using addCandlestickSeries if available (for markers support)
+        const chartAny = chart as any
+        let series: ISeriesApi<'Candlestick'>
+        if (typeof chartAny.addCandlestickSeries === 'function') {
+          series = chartAny.addCandlestickSeries(options) as ISeriesApi<'Candlestick'>
+        } else {
+          series = chart.addSeries(
+            CandlestickSeries,
+            options,
+          ) as ISeriesApi<'Candlestick'>
+        }
         series.setData(toCandles(normalized))
         mainSeriesRef.current = series
         
-        // Recreate price lines after series is created
-        // Use ref to get latest price lines even if state hasn't updated yet
-        const currentPriceLines = tradePriceLinesRef.current
-        if (currentPriceLines.length > 0) {
-          // Use requestAnimationFrame to ensure series is fully ready
-          requestAnimationFrame(() => {
-            if (mainSeriesRef.current && chartMode === 'candle') {
-              // Clear existing refs first
-              Object.values(tradePriceLineRefs.current).forEach((line) => {
-                try {
-                  mainSeriesRef.current?.removePriceLine(line)
-                } catch {
-                  /* noop */
-                }
-              })
-              tradePriceLineRefs.current = {}
-              
-              // Recreate all price lines
-              currentPriceLines.forEach((lineConfig) => {
-                try {
-                  const line = mainSeriesRef.current!.createPriceLine({
-                    price: lineConfig.price,
-                    color: lineConfig.color,
-                    lineStyle: LineStyle.Dashed, // Changed to dashed
-                    lineWidth: 1, // Changed to thin
-                    axisLabelVisible: true,
-                    title: lineConfig.label,
-                  })
-                  tradePriceLineRefs.current[lineConfig.id] = line
-                  console.log(`Recreated price line after series update: ${lineConfig.label}`)
-                } catch (error) {
-                  console.error('Failed to recreate price line:', error, lineConfig)
-                }
-              })
-              console.log(`Recreated ${currentPriceLines.length} price lines after series recreation`)
-            }
-          })
-        }
+        // Price lines and markers will be created by the useEffect hook
+        // No need to set them here as the effect will handle it
       } else {
         const options: AreaSeriesPartialOptions = {
           topColor: 'rgba(25,118,210,0.35)',
@@ -878,7 +970,7 @@ export const PriceChart = () => {
   }, [chartMode, indicatorConfigs, showIndicators, showVolume, data.length]) // Add data.length to detect when data is loaded
 
 
-  // Create price lines for trades
+  // Create price lines and markers for trades
   useEffect(() => {
     const series = mainSeriesRef.current
     if (!series) {
@@ -886,88 +978,84 @@ export const PriceChart = () => {
       return
     }
     
-    console.log('Price lines effect - chartMode:', chartMode, 'priceLines:', tradePriceLines.length)
+    console.log('Price lines effect - chartMode:', chartMode, 'priceLevels:', tradePriceLevels.length, 'showBuySellLines:', showBuySellLines)
+    
+    // Clear all existing price lines first
+    Object.values(tradePriceLineRefs.current).forEach((line) => {
+      try {
+        series.removePriceLine(line)
+      } catch {
+        /* noop */
+      }
+    })
+    tradePriceLineRefs.current = {}
     
     if (chartMode !== 'candle') {
-      // Clear trade price lines if not in candle mode
-      console.log('Price lines effect - Not in candle mode, clearing lines')
-      Object.values(tradePriceLineRefs.current).forEach((line) => {
-        try {
-          series.removePriceLine(line)
-        } catch {
-          /* noop */
-        }
-      })
-      tradePriceLineRefs.current = {}
-      return
-    }
-
-    // If showBuySellLines is false, remove all lines
-    if (!showBuySellLines) {
-      console.log('Price lines effect - Buy/Sell lines hidden, clearing lines')
-      Object.values(tradePriceLineRefs.current).forEach((line) => {
-        try {
-          series.removePriceLine(line)
-        } catch {
-          /* noop */
-        }
-      })
-      tradePriceLineRefs.current = {}
-      return
-    }
-
-    const existing = new Set(Object.keys(tradePriceLineRefs.current))
-    let createdCount = 0
-    let skippedCount = 0
-    
-    tradePriceLines.forEach((lineConfig) => {
-      if (tradePriceLineRefs.current[lineConfig.id]) {
-        existing.delete(lineConfig.id)
-        skippedCount++
-        return
-      }
-      
+      // Clear markers if not in candle mode
+      console.log('Price lines effect - Not in candle mode, clearing')
       try {
-        const line = series.createPriceLine({
-          price: lineConfig.price,
-          color: lineConfig.color,
-          lineStyle: LineStyle.Dashed, // Dashed line
-          lineWidth: 1, // Thin line
-          axisLabelVisible: true,
-          title: lineConfig.label,
-        })
-        tradePriceLineRefs.current[lineConfig.id] = line
-        createdCount++
-        console.log(`Created price line: ${lineConfig.label} at ${lineConfig.price}`)
-      } catch (error) {
-        console.error('Failed to create price line:', error, lineConfig)
-      }
-    })
-
-    // Remove lines that no longer exist
-    let removedCount = 0
-    existing.forEach((id) => {
-      const line = tradePriceLineRefs.current[id]
-      if (line) {
-        try {
-          series.removePriceLine(line)
-          removedCount++
-        } catch {
-          /* noop */
+        const seriesAny = series as any
+        if (typeof seriesAny.setMarkers === 'function') {
+          seriesAny.setMarkers([])
         }
-        delete tradePriceLineRefs.current[id]
+      } catch (error) {
+        console.error('Failed to clear markers:', error)
+      }
+      return
+    }
+
+    // If showBuySellLines is false, remove all price lines and markers
+    if (!showBuySellLines) {
+      console.log('Price lines effect - Buy/Sell lines hidden, clearing')
+      try {
+        const seriesAny = series as any
+        if (typeof seriesAny.setMarkers === 'function') {
+          seriesAny.setMarkers([])
+        }
+      } catch (error) {
+        console.error('Failed to clear markers:', error)
+      }
+      return
+    }
+
+    // Create price lines and markers
+    const markers: SeriesMarker<UTCTimestamp>[] = []
+    
+    tradePriceLevels.forEach((level) => {
+      try {
+        // Create price line
+        const priceLine = series.createPriceLine({
+          price: level.price,
+          color: level.color,
+          lineStyle: LineStyle.Dashed,
+          lineWidth: 1,
+          axisLabelVisible: true,
+          title: level.label,
+        })
+        tradePriceLineRefs.current[level.id] = priceLine
+        
+        // Add marker at start point if available
+        if (level.marker) {
+          markers.push(level.marker)
+        }
+      } catch (error) {
+        console.error('Failed to create price line:', error, level)
       }
     })
 
-    console.log('Price lines effect - Summary:', {
-      total: tradePriceLines.length,
-      created: createdCount,
-      skipped: skippedCount,
-      removed: removedCount,
-      current: Object.keys(tradePriceLineRefs.current).length,
-      showBuySellLines,
-    })
-  }, [chartMode, tradePriceLines, showBuySellLines])
+    // Update markers on series
+    try {
+      const seriesAny = series as any
+      if (typeof seriesAny.setMarkers === 'function') {
+        seriesAny.setMarkers(markers)
+        console.log(`Price lines effect - Created ${tradePriceLevels.length} price lines and ${markers.length} markers`)
+      } else {
+        console.warn('setMarkers is not available on this series type')
+      }
+    } catch (error) {
+      console.error('Failed to set markers:', error)
+    }
+  }, [chartMode, tradePriceLevels, showBuySellLines])
 
   useEffect(() => {
     const height = fullscreenChart ? 520 : 380

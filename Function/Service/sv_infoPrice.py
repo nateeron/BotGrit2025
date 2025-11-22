@@ -536,6 +536,11 @@ def Load_bar_lazy(req:req_getprice):
     timestamp_min = timeLoadAPI(req.datefrom) if req.datefrom != "" else 0
     timestamp_max = timeLoadAPI(req.dateto) if req.dateto != "" else 0
     
+    # Add 7 hours to dateto for TF 1m
+    if req.tf == '1m' and timestamp_max > 0:
+        timestamp_max += (7 * 60 * 60 * 1000)  # Add 7 hours in milliseconds
+        print(f"DEBUG: Load_bar_lazy - Added 7 hours to dateto for TF 1m")
+    
     print(f"DEBUG: Load_bar_lazy - timestamp_min: {timestamp_min} ({convert_timestamp(timestamp_min) if timestamp_min > 0 else 'N/A'})")
     print(f"DEBUG: Load_bar_lazy - timestamp_max: {timestamp_max} ({convert_timestamp(timestamp_max) if timestamp_max > 0 else 'N/A'})")
     
@@ -586,6 +591,12 @@ def Load_bar_lazy(req:req_getprice):
                 
                 if calbar >= interval_ms:
                     lengtbar_ = int(calbar / interval_ms)
+                    
+                    # Add 7 bars for TF 1m
+                    if req.tf == '1m':
+                        lengtbar_ += 7
+                        print(f"DEBUG: Load_bar_lazy - Added 7 bars for TF 1m")
+                    
                     print(f"DEBUG: Load_bar_lazy - lengtbar_ (bars to load): {lengtbar_}")
                     
                     limit_ = 1000 if lengtbar_ >= 1000 else lengtbar_
@@ -600,7 +611,12 @@ def Load_bar_lazy(req:req_getprice):
                     # so that when get_data subtracts, we get req_strptime_start
                     st = StartNewTime(req.tf, limit_)
                     starttime = req_strptime_start + st  # This will be adjusted in get_data
-                    endtime = req_strptime_start  # Earliest time we need (for filtering)
+                    
+                    # Adjust endtime to load 7 more bars earlier for TF 1m
+                    if req.tf == '1m':
+                        endtime = req_strptime_start - (7 * interval_ms)  # Load 7 bars earlier
+                    else:
+                        endtime = req_strptime_start  # Earliest time we need (for filtering)
                     
                     print(f"DEBUG: Load_bar_lazy - Loading data:")
                     print(f"  lengtbar_: {lengtbar_}")
