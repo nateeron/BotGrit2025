@@ -15,15 +15,6 @@ export const TradingPage = () => {
 
   return (
     <Box sx={{ width: '100%', px: { xs: 1, sm: 2, md: 3 }, py: { xs: 2, md: 3 } }}>
-      <Typography 
-        variant="h4" 
-        sx={{ 
-          mb: { xs: 2, md: 3 },
-          fontSize: { xs: '1.5rem', sm: '2rem' },
-        }}
-      >
-        Trading Dashboard
-      </Typography>
       <Grid container spacing={{ xs: 2, md: 3 }}>
         <Grid size={12}>
           <TopChartToolbar />
@@ -57,7 +48,9 @@ export const TradingPage = () => {
         </Grid>
         {!sidebarCollapsed && (
           <Grid size={{ xs: 12, lg: 4 }}>
-            <CoinListSidebar />
+            <Box sx={{ maxWidth: 250, width: '100%' }}>
+              <CoinListSidebar />
+            </Box>
           </Grid>
         )}
 

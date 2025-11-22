@@ -306,7 +306,7 @@ export const IndicatorManager = () => {
 
   return (
     <>
-      <Card sx={{ p: 0, borderRadius: 2 }}>
+      <Card sx={{ p: 0, borderRadius: 3 }}>
         <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h6">Indicator Manager</Typography>
@@ -362,7 +362,7 @@ export const IndicatorManager = () => {
                     display: 'flex',
                     alignItems: 'center',
                     border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 2,
+                    borderRadius: 3,
                     px: 2,
                     py: 1,
                     gap: 1,

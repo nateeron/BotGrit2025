@@ -67,7 +67,7 @@ export const CardReport = () => {
   }, [activeData])
 
   return (
-    <Card sx={{ p: 2, borderRadius: 2, height: '100%' }}>
+    <Card sx={{ p: 2, borderRadius: 3, height: '100%' }}>
       <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
         <Typography variant="h6">Performance</Typography>
         <Tabs
@@ -118,7 +118,7 @@ export const CardReport = () => {
                   sx={{
                     height: `${height}%`,
                     background: 'linear-gradient(180deg,#43a047,#1b5e20)',
-                    borderRadius: 1,
+                    borderRadius: 3,
                   }}
                 />
                 <Typography variant="caption" color="text.secondary">

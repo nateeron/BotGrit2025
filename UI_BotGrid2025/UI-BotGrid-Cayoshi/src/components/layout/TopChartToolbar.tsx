@@ -344,22 +344,26 @@ export const TopChartToolbar = () => {
         sx={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: { xs: 1, md: 2 },
+          gap: 0.5,
           alignItems: 'center',
           justifyContent: 'space-between',
           backgroundColor: 'rgba(255,255,255,0.04)',
-          borderRadius: { xs: 2, md: 3 },
-          px: { xs: 1.5, md: 3 },
-          py: { xs: 1.5, md: 2 },
+          borderRadius: 3,
+          border: '3px solid rgba(255,255,255,0.08)',
+          px: 0,
+          py: 0,
+          height: 35,
+          minHeight: 35,
+          maxHeight: 35,
         }}
       >
-        <Box sx={{ display: 'flex', gap: { xs: 1, md: 2 }, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
-            <AccessTimeIcon fontSize="small" sx={{ color: 'text.secondary', fontSize: { xs: 16, md: 20 } }} />
+        <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', alignItems: 'center', px: 1, py: 0 }}>
+          <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 0.5 }}>
+            <AccessTimeIcon fontSize="small" sx={{ color: 'text.secondary', fontSize: 14 }} />
             <Typography 
               variant="subtitle2" 
               color="text.secondary"
-              sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
+              sx={{ fontSize: '0.7rem' }}
             >
               TF
             </Typography>
@@ -375,10 +379,11 @@ export const TopChartToolbar = () => {
                 border: '3px solid',
                 borderColor: 'rgba(255,255,255,0.12)',
                 fontWeight: 'bold',
-                px: { xs: 1, md: 2 },
-                py: { xs: 0.25, md: 0.5 },
-                fontSize: { xs: '0.7rem', sm: '0.75rem', md: '0.875rem' },
-                minWidth: { xs: 36, sm: 44, md: 56 },
+                px: 0.75,
+                py: 0.25,
+                fontSize: '0.7rem',
+                minWidth: 32,
+                height: 24,
                 '&.Mui-selected': {
                   borderColor: 'primary.main',
                   borderWidth: '3px',
@@ -403,38 +408,47 @@ export const TopChartToolbar = () => {
             value={chartMode}
             exclusive
             onChange={(_, value) => value && setChartMode(value)}
+            sx={{
+              '& .MuiToggleButton-root': {
+                fontSize: '0.7rem',
+                px: 0.75,
+                py: 0.25,
+                height: 24,
+              },
+            }}
           >
             <ToggleButton value="candle">Candle</ToggleButton>
             <ToggleButton value="line">Line</ToggleButton>
           </ToggleButtonGroup>
         </Box>
 
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1, md: 2 }, alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center', px: 1, py: 0 }}>
           <FormControlLabel
             control={<Switch checked={showIndicators} onChange={toggleIndicators} size="small" />}
             label={
-              <Typography sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+              <Typography sx={{ fontSize: '0.7rem' }}>
                 Indicators
               </Typography>
             }
+            sx={{ margin: 0 }}
           />
           <FormControlLabel
             control={<Switch checked={showVolume} onChange={toggleVolume} size="small" />}
             label={
-              <Typography sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+              <Typography sx={{ fontSize: '0.7rem' }}>
                 Volume
               </Typography>
             }
-            sx={{ display: { xs: 'none', sm: 'flex' } }}
+            sx={{ display: { xs: 'none', sm: 'flex' }, margin: 0 }}
           />
           <Tooltip title="Chart Settings">
             <IconButton 
               color="inherit" 
               onClick={() => setShowSettingsDialog(true)}
               size="small"
-              sx={{ padding: { xs: 0.5, md: 1 } }}
+              sx={{ padding: 0.25 }}
             >
-              <SettingsIcon sx={{ fontSize: { xs: 18, md: 24 } }} />
+              <SettingsIcon sx={{ fontSize: 16 }} />
             </IconButton>
           </Tooltip>
           <Tooltip title={fullscreenChart ? 'Exit Fullscreen' : 'Fullscreen'}>
@@ -442,11 +456,11 @@ export const TopChartToolbar = () => {
               color="inherit" 
               onClick={toggleFullscreen}
               size="small"
-              sx={{ padding: { xs: 0.5, md: 1 } }}
+              sx={{ padding: 0.25 }}
             >
               <FullscreenIcon 
                 color={fullscreenChart ? 'primary' : 'inherit'} 
-                sx={{ fontSize: { xs: 18, md: 24 } }}
+                sx={{ fontSize: 16 }}
               />
             </IconButton>
           </Tooltip>
@@ -458,27 +472,28 @@ export const TopChartToolbar = () => {
         sx={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: { xs: 1, md: 2 },
+          gap: 0.5,
           alignItems: 'center',
           backgroundColor: 'rgba(255,255,255,0.02)',
-          borderRadius: { xs: 2, md: 3 },
-          px: { xs: 1.5, md: 3 },
-          py: { xs: 1.5, md: 2 },
-          mt: { xs: 1.5, md: 2 },
+          borderRadius: 3,
+          border: '3px solid rgba(255,255,255,0.08)',
+          px: 0,
+          py: 0,
+          mt: 1,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flex: 1, flexWrap: 'wrap', px: 1, py: 0.75 }}>
           <Typography 
             variant="subtitle2" 
             color="text.secondary" 
             sx={{ 
-              minWidth: { xs: 60, md: 100 },
-              fontSize: { xs: '0.75rem', md: '0.875rem' },
+              minWidth: 60,
+              fontSize: '0.7rem',
             }}
           >
             Indicators:
           </Typography>
-          <Stack direction="row" flexWrap="wrap" spacing={1} useFlexGap sx={{ flex: 1 }}>
+          <Stack direction="row" flexWrap="wrap" spacing={0.5} useFlexGap sx={{ flex: 1 }}>
             {indicatorPresets.map((preset) => {
               const active = indicatorConfigs.some(
                 (config) => config.id === preset.id,

@@ -23,7 +23,7 @@ export const CardBotSetting = () => {
   const [running, setRunning] = useState(false)
 
   return (
-    <Card sx={{ p: 2, borderRadius: 2, height: '100%' }}>
+    <Card sx={{ p: 2, borderRadius: 3, height: '100%' }}>
       <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6">Bot Setting</Typography>

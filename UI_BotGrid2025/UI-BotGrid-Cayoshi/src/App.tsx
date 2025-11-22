@@ -28,7 +28,7 @@ const App = () => {
           },
         },
         shape: {
-          borderRadius: 12,
+          borderRadius: 3,
         },
         typography: {
           fontFamily: 'Inter, "Prompt", "Noto Sans Thai", sans-serif',
@@ -38,7 +38,7 @@ const App = () => {
             styleOverrides: {
               root: {
                 backgroundColor: '#111826',
-                border: '1px solid rgba(255,255,255,0.05)',
+                border: '3px solid rgba(255,255,255,0.08)',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
               },
             },
@@ -49,7 +49,7 @@ const App = () => {
             },
             styleOverrides: {
               root: {
-                borderRadius: 12,
+                borderRadius: 3,
               },
             },
           },

@@ -36,7 +36,7 @@ export const CardOrderList = () => {
   }, [])
 
   return (
-    <Card sx={{ p: 2, borderRadius: 2, height: '100%' }}>
+    <Card sx={{ p: 2, borderRadius: 3, height: '100%' }}>
       <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
           <Typography variant="h6">Orders</Typography>

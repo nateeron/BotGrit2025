@@ -848,7 +848,8 @@ export const PriceChart = () => {
         position: 'relative' as const,
         flexGrow: 1,
         minHeight: { xs: 250, sm: 300, md: 380 },
-        borderRadius: { xs: 2, md: 3 },
+        borderRadius: 3,
+        border: '3px solid rgba(255,255,255,0.08)',
         overflow: 'hidden',
         backgroundColor: 'rgba(255,255,255,0.02)',
       }
@@ -948,18 +949,18 @@ export const PriceChart = () => {
         <Box
           sx={{
             position: 'absolute',
-            top: { xs: 8, md: 16 },
-            left: { xs: 8, md: 16 },
+            top: 8,
+            left: 8,
             display: 'flex',
             flexDirection: 'column',
-            gap: 0.5,
+            gap: 0.25,
             pointerEvents: 'none',
           }}
         >
           <Typography 
             variant="h6"
             sx={{ 
-              fontSize: { xs: '0.875rem', sm: '1rem', md: '1.25rem' },
+              fontSize: '0.875rem',
             }}
           >
             {selectedCoin}/USDT · {interval.toUpperCase()}
@@ -968,7 +969,7 @@ export const PriceChart = () => {
             variant="caption" 
             color="text.secondary"
             sx={{ 
-              fontSize: { xs: '0.65rem', sm: '0.75rem' },
+              fontSize: '0.65rem',
               display: { xs: 'none', sm: 'block' },
             }}
           >
@@ -981,7 +982,8 @@ export const PriceChart = () => {
       </Box>
       <Box
         sx={{
-          borderRadius: { xs: 2, md: 3 },
+          borderRadius: 3,
+          border: '3px solid rgba(255,255,255,0.08)',
           backgroundColor: 'rgba(255,255,255,0.02)',
           p: { xs: 0.75, md: 1 },
           minHeight: { xs: 120, sm: 140, md: 160 },

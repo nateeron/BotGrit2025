@@ -51,7 +51,7 @@ export const LeftMenuMini = () => {
           >
             <ListItemButton
               sx={{
-                borderRadius: 2,
+                borderRadius: 3,
                 mx: expanded ? 2 : 1,
                 my: 0.5,
                 gap: 1,

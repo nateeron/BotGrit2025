@@ -54,14 +54,17 @@ export const CoinListSidebar = () => {
     <Box
       sx={{
         height: '100%',
+        width: '100%',
+        maxWidth: 250,
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: 'rgba(255,255,255,0.02)',
         borderRadius: 3,
-        p: 2,
+        border: '3px solid rgba(255,255,255,0.08)',
+        p: 1,
       }}
     >
-      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2 }}>
+      <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mb: 1 }}>
         <TextField
           fullWidth
           size="small"
@@ -102,53 +105,41 @@ export const CoinListSidebar = () => {
                 onClick={() => setSelectedCoin(coin.symbol)}
                 selected={isSelected}
                 sx={{
-                  borderRadius: 2,
-                  mb: 0.5,
+                  borderRadius: 3,
+                  mb: 0.25,
+                  px: 1,
+                  py: 0.5,
                   '&.Mui-selected': {
                     backgroundColor: 'rgba(25,118,210,0.2)',
                   },
                 }}
               >
-                <Avatar
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    mr: 2,
-                    fontSize: 14,
-                    bgcolor: 'rgba(255,255,255,0.08)',
-                  }}
-                >
-                  {getAvatarChar(coin.symbol)}
-                </Avatar>
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Typography variant="subtitle2">{coin.symbol}</Typography>
-                      <Typography variant="subtitle2">${coin.price.toLocaleString()}</Typography>
-                    </Box>
-                  }
-                  secondary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        {coin.name}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color={coin.changePct >= 0 ? 'success.main' : 'error.main'}
-                      >
-                        {coin.changePct > 0 ? '+' : ''}
-                        {coin.changePct.toFixed(2)}%
-                      </Typography>
-                    </Box>
-                  }
-                  primaryTypographyProps={{ component: 'div' }}
-                  secondaryTypographyProps={{ component: 'div' }}
-                />
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.75rem' }}>
+                    {coin.symbol}
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.125 }}>
+                    <Typography variant="subtitle2" sx={{ fontSize: '0.7rem' }}>
+                      ${coin.price.toLocaleString()}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: '0.65rem',
+                        color: coin.changePct >= 0 ? 'success.main' : 'error.main',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {coin.changePct > 0 ? '+' : ''}
+                      {coin.changePct.toFixed(2)}%
+                    </Typography>
+                  </Box>
+                </Box>
               </ListItemButton>
             )
           })}
-          <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.08)' }} />
-          <Typography variant="caption" color="text.secondary">
+          <Divider sx={{ my: 0.75, borderColor: 'rgba(255,255,255,0.08)' }} />
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
             {filteredCoins.length} markets
           </Typography>
         </List>
