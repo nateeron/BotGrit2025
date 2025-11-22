@@ -74,6 +74,7 @@ def getprice(req: req_getprice):
             return resps
         except Exception as e:
             print(f'Error infoPrice/getprice_start getprice : {e}')
+            
 @r_infoPrice.post("/infoPrice/Load_bar_lazy")
 def Loadbarlazy(req: req_getprice):
         """
@@ -100,9 +101,24 @@ def Loadbarlazy(req: req_getprice):
         try:
             resp = Load_bar_lazy(req)
             print(f"DEBUG: Load_bar_lazy - Response type: {type(resp)}")
-            print(f"DEBUG: Load_bar_lazy - Response length: {len(resp) if isinstance(resp, list) else 'N/A'}")
-            resp_converted = convert_objectid(resp)
-            resps = JSONResponse(content=resp_converted)
+            resp_count = len(resp) if isinstance(resp, list) else 0
+            print(f"DEBUG: Load_bar_lazy - Response length: {resp_count}")
+            
+            # Return only count to avoid large response size
+            # If getAll is True, return data as well
+            if req.getAll:
+                resp_converted = convert_objectid(resp)
+                response_data = {
+                    "data": resp_converted,
+                    "count": resp_count
+                }
+            else:
+                # Return only count to save bandwidth
+                response_data = {
+                    "count": resp_count
+                }
+            
+            resps = JSONResponse(content=response_data)
             return resps
         except Exception as e:
             print(f"ERROR: Load_bar_lazy - Exception: {e}")
