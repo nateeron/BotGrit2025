@@ -202,6 +202,8 @@ export const PriceChart = () => {
   
   const setMainChartRef = useChartRefsStore((state) => state.setMainChartRef)
   const setMainMousePos = useChartRefsStore((state) => state.setMainMousePos)
+  const rsiMousePos = useChartRefsStore((state) => state.rsiMousePos)
+  const rsiChartRef = useChartRefsStore((state) => state.rsiChartRef)
 
   const symbolPair = useMemo(
     () => `${selectedCoin}USDT`,
@@ -339,6 +341,8 @@ export const PriceChart = () => {
           const time = chartRef.current.timeScale().coordinateToTime(x)
           if (time !== null) {
             setMainMousePos({ x, y })
+            // Clear RSI mouse pos to prevent sync back
+            useChartRefsStore.getState().setRsiMousePos(null)
           } else {
             setMainMousePos(null)
           }
@@ -513,6 +517,31 @@ export const PriceChart = () => {
       mainChart.timeScale().unsubscribeVisibleTimeRangeChange(handler)
     }
   }, [syncRsiChart, data])
+
+  // Sync cursor from RSI chart when sync is enabled
+  useEffect(() => {
+    if (!syncRsiChart || !chartRef.current || !rsiChartRef) {
+      return
+    }
+
+    if (!rsiMousePos) {
+      return
+    }
+
+    try {
+      // Get time from RSI chart's mouse position
+      const time = rsiChartRef.timeScale().coordinateToTime(rsiMousePos.x)
+      if (time !== null) {
+        // Convert time to coordinate in main chart
+        const mainX = chartRef.current.timeScale().timeToCoordinate(time)
+        if (mainX !== null && mainX >= 0) {
+          setMousePos({ x: mainX, y: rsiMousePos.y })
+        }
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+  }, [rsiMousePos, syncRsiChart, rsiChartRef])
 
   useEffect(() => {
     let cancelled = false

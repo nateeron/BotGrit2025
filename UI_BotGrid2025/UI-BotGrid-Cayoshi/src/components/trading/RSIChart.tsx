@@ -13,6 +13,7 @@ export const RSIChart = () => {
   const setRsiChartRef = useChartRefsStore((state) => state.setRsiChartRef)
   const mainMousePos = useChartRefsStore((state) => state.mainMousePos)
   const mainChartRef = useChartRefsStore((state) => state.mainChartRef)
+  const setRsiMousePos = useChartRefsStore((state) => state.setRsiMousePos)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const rsiSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
@@ -155,20 +156,36 @@ export const RSIChart = () => {
     const container = containerRef.current
     if (!container) return
 
-    // Only handle local mouse events if sync is disabled
-    if (syncRsiChart) {
-      return
-    }
-
     const handleMouseMove = (e: MouseEvent) => {
       const rect = container.getBoundingClientRect()
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
       setMousePos({ x, y })
+      
+      // Sync mouse position to main chart if sync is enabled
+      if (syncRsiChart && chartRef.current) {
+        try {
+          // Verify that the coordinate is valid (within chart bounds)
+          const time = chartRef.current.timeScale().coordinateToTime(x)
+          if (time !== null) {
+            setRsiMousePos({ x, y })
+            // Clear main mouse pos to prevent sync back
+            useChartRefsStore.getState().setMainMousePos(null)
+          } else {
+            setRsiMousePos(null)
+          }
+        } catch (e) {
+          // Ignore errors
+          setRsiMousePos(null)
+        }
+      }
     }
 
     const handleMouseLeave = () => {
       setMousePos(null)
+      if (syncRsiChart) {
+        setRsiMousePos(null)
+      }
     }
 
     container.addEventListener('mousemove', handleMouseMove)
@@ -178,7 +195,7 @@ export const RSIChart = () => {
       container.removeEventListener('mousemove', handleMouseMove)
       container.removeEventListener('mouseleave', handleMouseLeave)
     }
-  }, [syncRsiChart])
+  }, [syncRsiChart, setRsiMousePos])
 
   return (
     <Box
