@@ -58,6 +58,10 @@ interface TradingState {
   setPriceLevels: (levels: PriceLevel[]) => void
   resetToDefaults: () => void
   loadSettings: () => void
+  showBuySellLines: boolean
+  setShowBuySellLines: (show: boolean) => void
+  reloadBacktestData: (() => void) | null
+  setReloadBacktestData: (fn: (() => void) | null) => void
 }
 
 const INDICATOR_STORAGE_KEY = 'trading.indicators'
@@ -176,6 +180,10 @@ export const useTradingStore = create<TradingState>((set, get) => {
     indicatorConfigs: [],
     tvStudies: [],
     priceLevels: [],
+    showBuySellLines: true,
+    setShowBuySellLines: (show) => set({ showBuySellLines: show }),
+    reloadBacktestData: null,
+    setReloadBacktestData: (fn) => set({ reloadBacktestData: fn }),
     setSelectedCoin: (symbol) => {
       set({ selectedCoin: symbol })
       const current = get()

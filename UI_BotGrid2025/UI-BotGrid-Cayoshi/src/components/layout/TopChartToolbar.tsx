@@ -27,6 +27,10 @@ import SettingsIcon from '@mui/icons-material/Settings'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
+import { CircularProgress } from '@mui/material'
 import type {
   IndicatorConfig,
   IndicatorType,
@@ -284,7 +288,12 @@ export const TopChartToolbar = () => {
     toggleVolume,
     toggleFullscreen,
     setShowSettingsDialog,
+    showBuySellLines,
+    setShowBuySellLines,
+    reloadBacktestData,
   } = useTradingStore()
+  
+  const [reloadingTrades, setReloadingTrades] = useState(false)
 
   const indicatorConfigs = useTradingStore((state) => state.indicatorConfigs)
   const loadIndicatorConfigs = useTradingStore(
@@ -335,6 +344,17 @@ export const TopChartToolbar = () => {
     }
     if (!enabled && exists) {
       removeIndicatorConfig(preset.id)
+    }
+  }
+
+  const handleReloadBacktest = async () => {
+    if (reloadBacktestData) {
+      setReloadingTrades(true)
+      try {
+        await reloadBacktestData()
+      } finally {
+        setTimeout(() => setReloadingTrades(false), 500)
+      }
     }
   }
 
@@ -441,6 +461,38 @@ export const TopChartToolbar = () => {
             }
             sx={{ display: { xs: 'none', sm: 'flex' }, margin: 0 }}
           />
+          <Tooltip title="Reload Backtest Data">
+            <IconButton 
+              color="inherit" 
+              onClick={handleReloadBacktest}
+              disabled={!reloadBacktestData || reloadingTrades}
+              size="small"
+              sx={{ padding: 0.25 }}
+            >
+              {reloadingTrades ? (
+                <CircularProgress size={14} sx={{ color: 'inherit' }} />
+              ) : (
+                <RefreshIcon sx={{ fontSize: 16 }} />
+              )}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={showBuySellLines ? "Hide Buy/Sell Lines" : "Show Buy/Sell Lines"}>
+            <IconButton 
+              color="inherit" 
+              onClick={() => setShowBuySellLines(!showBuySellLines)}
+              size="small"
+              sx={{ 
+                padding: 0.25,
+                color: showBuySellLines ? 'primary.main' : 'inherit',
+              }}
+            >
+              {showBuySellLines ? (
+                <VisibilityIcon sx={{ fontSize: 16 }} />
+              ) : (
+                <VisibilityOffIcon sx={{ fontSize: 16 }} />
+              )}
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Chart Settings">
             <IconButton 
               color="inherit" 

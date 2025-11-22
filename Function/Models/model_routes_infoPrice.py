@@ -9,6 +9,7 @@ class req_getprice(BaseModel):
     dateto: str
     limit: int
     ohlc:str # o | h |c | l | all
+    timezone: str = "Asia/Bangkok"  # Default to Bangkok timezone
     
 class resp_price(BaseModel):
     _id: object

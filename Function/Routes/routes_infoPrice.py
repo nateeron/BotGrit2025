@@ -6,7 +6,9 @@ from Function.Service.sv_infoPrice import (LoadPrice,load_date,
                                            deleteData,
                                            timeLoadAPI,
                                            Load_bar_lazy,
-                                           LoadPrice_Start)
+                                           LoadPrice_Start,
+                                           check_data_continuity,
+                                           log_continuity_check)
 
 import json
 from datetime import datetime,timedelta
@@ -85,13 +87,28 @@ def Loadbarlazy(req: req_getprice):
             "ohlc":"ohlc"
         }
         """
-        resp= []
-        resp = Load_bar_lazy(req)
-        print(type(resp))
-        resp_converted = convert_objectid(resp)
-        resps = JSONResponse(content=resp_converted)
+        print("=" * 80)
+        print("DEBUG: Load_bar_lazy - Request Data:")
+        print(f"  symbol: {req.symbol}")
+        print(f"  tf: {req.tf}")
+        print(f"  datefrom: {req.datefrom}")
+        print(f"  dateto: {req.dateto}")
+        print(f"  limit: {req.limit}")
+        print(f"  getAll: {req.getAll}")
+        print("=" * 80)
         
-        return resps
+        try:
+            resp = Load_bar_lazy(req)
+            print(f"DEBUG: Load_bar_lazy - Response type: {type(resp)}")
+            print(f"DEBUG: Load_bar_lazy - Response length: {len(resp) if isinstance(resp, list) else 'N/A'}")
+            resp_converted = convert_objectid(resp)
+            resps = JSONResponse(content=resp_converted)
+            return resps
+        except Exception as e:
+            print(f"ERROR: Load_bar_lazy - Exception: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=str(e))
     
 
 @r_infoPrice.get("/infoPrice/date")
@@ -134,3 +151,29 @@ def get_price(req: req_getprice):
 def delete_Data(req : DeleteRequest):
     resp = deleteData(req.tableName)
     return resp
+
+@r_infoPrice.post("/infoPrice/check_continuity")
+def check_continuity(req: req_getprice):
+    """
+    Check data continuity in database to ensure no gaps between timestamps.
+    
+    Request:
+    {
+        "symbol":"BTCUSDT",
+        "tf":"1h",
+        "getAll": false,
+        "datefrom":"",
+        "dateto":"",
+        "limit": 1000,
+        "ohlc":"ohlc"
+    }
+    """
+    try:
+        table_collection = req.symbol + '_' + req.tf
+        continuity_result = check_data_continuity(table_collection, req.tf, limit=req.limit if req.limit > 0 else 1000)
+        
+        resp_converted = convert_objectid(continuity_result)
+        return JSONResponse(content=resp_converted)
+    except Exception as e:
+        print(f'Error infoPrice/check_continuity: {e}')
+        raise HTTPException(status_code=500, detail=str(e))

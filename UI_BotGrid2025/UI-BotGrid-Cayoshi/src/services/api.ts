@@ -222,15 +222,23 @@ const buildInfoPricePayload = (
   limit?: number,
   from?: number,
   to?: number,
-) => ({
-  symbol,
-  tf: interval,
-  getAll: false,
-  datefrom: from ? formatTimestampForApi(from) : '',
-  dateto: to ? formatTimestampForApi(to) : '',
-  ohlc: 'ohlc',
-  limit: limit ?? 1000,
-})
+) => {
+  // Get client timezone
+  const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  // Expected Bangkok timezone
+  const expectedTimezone = 'Asia/Bangkok'
+  
+  return {
+    symbol,
+    tf: interval,
+    getAll: false,
+    datefrom: from ? formatTimestampForApi(from) : '',
+    dateto: to ? formatTimestampForApi(to) : '',
+    ohlc: 'ohlc',
+    limit: limit ?? 1000,
+    timezone: clientTimezone, // Send client timezone for validation
+  }
+}
 
 export interface FetchChartParams {
   symbol: string
