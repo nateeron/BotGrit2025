@@ -11,7 +11,6 @@ import {
   HistogramSeries,
   LineSeries,
   LineStyle,
-  createSeriesMarkers,
   createChart,
 } from 'lightweight-charts'
 import type {
@@ -23,16 +22,12 @@ import type {
   ISeriesApi,
   LineData,
   LineSeriesPartialOptions,
-  SeriesMarker,
-  ISeriesMarkersPluginApi,
-  Time,
   UTCTimestamp,
 } from 'lightweight-charts'
 import {
   fetchBacktestTrades,
   fetchChartBootstrap,
   fetchChartWindow,
-  getPriceLevels,
   subscribeBinanceKlines,
   type BacktestTrade,
   type OhlcPoint,
@@ -155,37 +150,58 @@ const intervalToSeconds = (interval: string) => {
   return (multipliers[unit] ?? 60) * value
 }
 
-const convertTradesToMarkers = (
+interface TradePriceLine {
+  id: string
+  price: number
+  color: string
+  label: string
+}
+
+const convertTradesToPriceLines = (
   trades: BacktestTrade[],
-): SeriesMarker<UTCTimestamp>[] => {
-  const duplicates = new Map<number, number>()
-  return trades.flatMap((trade) => {
-    const buyTime = (Math.floor(trade.timestem_buy / 1000) +
-      7 * 60 * 60) as UTCTimestamp
-    const buyMarker: SeriesMarker<UTCTimestamp> = {
-      time: buyTime,
-      position: 'belowBar',
-      color: '#4A9FE6',
-      shape: 'arrowUp',
-      text: `Buy @ ${Number(trade.priceAction).toFixed(4)}`,
+): TradePriceLine[] => {
+  const priceLines: TradePriceLine[] = []
+  const priceCounts = new Map<number, { buy: number; sell: number }>()
+
+  trades.forEach((trade) => {
+    const buyPrice = Number(trade.priceAction)
+    
+    if (!priceCounts.has(buyPrice)) {
+      priceCounts.set(buyPrice, { buy: 0, sell: 0 })
     }
-    if (!trade.timestem_sell || trade.status === 0) {
-      return [buyMarker]
+    const counts = priceCounts.get(buyPrice)!
+    counts.buy++
+
+    if (trade.timestem_sell && trade.status !== 0) {
+      const sellPrice = Number(trade.priceSell)
+      if (!priceCounts.has(sellPrice)) {
+        priceCounts.set(sellPrice, { buy: 0, sell: 0 })
+      }
+      const sellCounts = priceCounts.get(sellPrice)!
+      sellCounts.sell++
     }
-    const sellTime = (Math.floor(trade.timestem_sell / 1000) +
-      7 * 60 * 60) as UTCTimestamp
-    const duplicateCount = duplicates.get(trade.timestem_sell) ?? 0
-    duplicates.set(trade.timestem_sell, duplicateCount + 1)
-    const suffix = duplicateCount > 0 ? ` x${duplicateCount + 1}` : ''
-    const sellMarker: SeriesMarker<UTCTimestamp> = {
-      time: sellTime,
-      position: 'aboveBar',
-      color: '#DA46EE',
-      shape: 'arrowDown',
-      text: `Sell @ ${Number(trade.priceSell).toFixed(4)}${suffix}`,
-    }
-    return [buyMarker, sellMarker]
   })
+
+  priceCounts.forEach((counts, price) => {
+    if (counts.buy > 0) {
+      priceLines.push({
+        id: `buy-${price}`,
+        price,
+        color: '#4A9FE6',
+        label: `Buy ${counts.buy > 1 ? `x${counts.buy}` : ''} @ ${price.toFixed(4)}`,
+      })
+    }
+    if (counts.sell > 0) {
+      priceLines.push({
+        id: `sell-${price}`,
+        price,
+        color: '#DA46EE',
+        label: `Sell ${counts.sell > 1 ? `x${counts.sell}` : ''} @ ${price.toFixed(4)}`,
+      })
+    }
+  })
+
+  return priceLines
 }
 
 export const PriceChart = () => {
@@ -219,43 +235,37 @@ export const PriceChart = () => {
   const mainSeriesRef = useRef<MainSeries | null>(null)
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const indicatorSeriesRef = useRef<Record<string, ISeriesApi<'Line'>[]>>({})
-  const priceLineRefs = useRef<Record<string, PriceLineInstance>>({})
+  const tradePriceLineRefs = useRef<Record<string, PriceLineInstance>>({})
   const realtimeCleanupRef = useRef<() => void>(() => {})
   const dataRef = useRef<OhlcPoint[]>([])
   const startTimestampRef = useRef<UTCTimestamp | null>(null)
   const loadingMoreRef = useRef(false)
-  const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const isInitialLoadRef = useRef(true)
 
   const indicatorConfigs = useTradingStore((state) => state.indicatorConfigs)
   const loadIndicatorConfigs = useTradingStore(
     (state) => state.loadIndicatorConfigs,
   )
-  const priceLevels = useTradingStore((state) => state.priceLevels)
-  const setPriceLevels = useTradingStore((state) => state.setPriceLevels)
   const setChartData = useChartDataStore((state) => state.setChartData)
 
   const [data, setData] = useState<OhlcPoint[]>([])
-  const [markers, setMarkers] = useState<SeriesMarker<UTCTimestamp>[]>([])
+  const [tradePriceLines, setTradePriceLines] = useState<TradePriceLine[]>([])
+  const [trades, setTrades] = useState<BacktestTrade[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null)
+
+  // Count Buy and Sell trades
+  const tradeCounts = useMemo(() => {
+    const buyCount = trades.filter((trade) => trade.status !== 0 || !trade.timestem_sell).length
+    const sellCount = trades.filter((trade) => trade.timestem_sell && trade.status !== 0).length
+    return { buy: buyCount, sell: sellCount }
+  }, [trades])
 
   useEffect(() => {
     loadIndicatorConfigs()
   }, [loadIndicatorConfigs])
 
-  useEffect(() => {
-    let active = true
-    const loadLevels = async () => {
-      const levels = await getPriceLevels(selectedCoin)
-      if (active) setPriceLevels(levels)
-    }
-    loadLevels()
-    return () => {
-      active = false
-    }
-  }, [selectedCoin, setPriceLevels])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -412,23 +422,25 @@ export const PriceChart = () => {
     }
   }, [])
 
-  const loadMarkers = useCallback(
+  const loadTradePriceLines = useCallback(
     async (startTime: UTCTimestamp | null) => {
       if (!startTime) {
-        setMarkers([])
+        setTradePriceLines([])
         return
       }
       try {
-        const trades = await fetchBacktestTrades({
+        const tradesData = await fetchBacktestTrades({
           symbol: symbolPair,
           interval,
           startTime,
           limit: 1000,
         })
-        setMarkers(convertTradesToMarkers(trades))
-      } catch (markerError) {
-        console.warn('loadMarkers error', markerError)
-        setMarkers([])
+        setTrades(tradesData)
+        setTradePriceLines(convertTradesToPriceLines(tradesData))
+      } catch (error) {
+        console.warn('loadTradePriceLines error', error)
+        setTrades([])
+        setTradePriceLines([])
       }
     },
     [interval, symbolPair],
@@ -564,7 +576,7 @@ export const PriceChart = () => {
         startTimestampRef.current = candles[0]?.time ?? null
         setData(candles)
         setChartData(candles) // Share data with RSI chart
-        await loadMarkers(candles[0]?.time ?? null)
+        await loadTradePriceLines(candles[0]?.time ?? null)
         realtimeCleanupRef.current = subscribeBinanceKlines(
           symbolPair,
           interval,
@@ -584,7 +596,7 @@ export const PriceChart = () => {
     return () => {
       cancelled = true
     }
-  }, [handleRealtimeCandle, interval, loadMarkers, symbolPair])
+  }, [handleRealtimeCandle, interval, loadTradePriceLines, symbolPair])
 
   useEffect(() => {
     if (!chartRef.current || data.length === 0) return
@@ -593,24 +605,30 @@ export const PriceChart = () => {
 
     const clearPriceLines = () => {
       if (!mainSeriesRef.current) return
-      Object.values(priceLineRefs.current).forEach((line) => {
+      // Only clear trade price lines, not priceLevels
+      Object.values(tradePriceLineRefs.current).forEach((line) => {
         try {
           mainSeriesRef.current?.removePriceLine(line)
         } catch {
           /* noop */
         }
       })
-      priceLineRefs.current = {}
+      tradePriceLineRefs.current = {}
     }
 
     if (mainSeriesRef.current) {
       clearPriceLines()
+      // Clear trade price lines
+      Object.values(tradePriceLineRefs.current).forEach((line) => {
+        try {
+          mainSeriesRef.current?.removePriceLine(line)
+        } catch {
+          /* noop */
+        }
+      })
+      tradePriceLineRefs.current = {}
       chart.removeSeries(mainSeriesRef.current)
       mainSeriesRef.current = null
-    }
-    if (markersPluginRef.current) {
-      markersPluginRef.current.detach()
-      markersPluginRef.current = null
     }
     Object.values(indicatorSeriesRef.current).forEach((lines) => {
       lines.forEach((line) => chart.removeSeries(line))
@@ -634,8 +652,6 @@ export const PriceChart = () => {
         options,
       ) as ISeriesApi<'Candlestick'>
       series.setData(toCandles(normalized))
-      markersPluginRef.current = createSeriesMarkers(series)
-      markersPluginRef.current?.setMarkers(markers as SeriesMarker<Time>[])
       mainSeriesRef.current = series
     } else {
       const options: AreaSeriesPartialOptions = {
@@ -691,48 +707,57 @@ export const PriceChart = () => {
       chart.timeScale().fitContent()
       isInitialLoadRef.current = false
     }
-  }, [chartMode, data, indicatorConfigs, markers, showIndicators, showVolume])
+  }, [chartMode, data, indicatorConfigs, showIndicators, showVolume])
 
+
+  // Create price lines for trades
   useEffect(() => {
     const series = mainSeriesRef.current
-    if (!series) return
-    const existing = new Set(Object.keys(priceLineRefs.current))
-    priceLevels.forEach((level) => {
-      if (priceLineRefs.current[level.id]) {
-        existing.delete(level.id)
+    if (!series || chartMode !== 'candle') {
+      // Clear trade price lines if not in candle mode
+      Object.values(tradePriceLineRefs.current).forEach((line) => {
+        try {
+          series?.removePriceLine(line)
+        } catch {
+          /* noop */
+        }
+      })
+      tradePriceLineRefs.current = {}
+      return
+    }
+
+    const existing = new Set(Object.keys(tradePriceLineRefs.current))
+    
+    tradePriceLines.forEach((lineConfig) => {
+      if (tradePriceLineRefs.current[lineConfig.id]) {
+        existing.delete(lineConfig.id)
         return
       }
+      
       const line = series.createPriceLine({
-        price: level.price,
-        color: level.side === 'Buy' ? '#26a69a' : '#ef5350',
-        lineStyle: LineStyle.Dashed,
-        lineWidth: 1,
+        price: lineConfig.price,
+        color: lineConfig.color,
+        lineStyle: LineStyle.Solid,
+        lineWidth: 2,
         axisLabelVisible: true,
-        title: level.label ?? level.side,
+        title: lineConfig.label,
       })
-      priceLineRefs.current[level.id] = line
+      tradePriceLineRefs.current[lineConfig.id] = line
     })
+
+    // Remove lines that no longer exist
     existing.forEach((id) => {
-      const line = priceLineRefs.current[id]
+      const line = tradePriceLineRefs.current[id]
       if (line) {
         try {
           series.removePriceLine(line)
         } catch {
           /* noop */
         }
-        delete priceLineRefs.current[id]
+        delete tradePriceLineRefs.current[id]
       }
     })
-  }, [priceLevels])
-
-  useEffect(() => {
-    if (!markersPluginRef.current) return
-    if (chartMode !== 'candle') {
-      markersPluginRef.current.setMarkers([])
-      return
-    }
-    markersPluginRef.current.setMarkers(markers as SeriesMarker<Time>[])
-  }, [chartMode, markers])
+  }, [chartMode, tradePriceLines])
 
   useEffect(() => {
     const height = fullscreenChart ? 520 : 380
@@ -908,6 +933,74 @@ export const PriceChart = () => {
             {showVolume ? ' · Volume' : ''}
           </Typography>
         </Box>
+        {/* Trade Counts Display */}
+        {trades.length > 0 && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0.5,
+              pointerEvents: 'none',
+              zIndex: 10,
+            }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: '#26a69a',
+                }}
+              />
+              <Typography 
+                variant="body2"
+                sx={{ 
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  color: '#26a69a',
+                }}
+              >
+                Buy: {tradeCounts.buy}
+              </Typography>
+            </Box>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: '#ef5350',
+                }}
+              />
+              <Typography 
+                variant="body2"
+                sx={{ 
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  color: '#ef5350',
+                }}
+              >
+                Sell: {tradeCounts.sell}
+              </Typography>
+            </Box>
+          </Box>
+        )}
         <ChartSettingsDialog />
       </Box>
     </Box>
