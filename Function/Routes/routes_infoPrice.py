@@ -33,7 +33,7 @@ def convert_objectid(obj):
 @r_infoPrice.post("/infoPrice/getprice")
 def getprice(req: req_getprice):
         """
-        Model send Post on Postman
+        Model send Post on Postman s
         {
             "symbol":"XRPUSDT",
             "tf":"1m",
