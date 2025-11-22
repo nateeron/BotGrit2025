@@ -605,7 +605,7 @@ export const PriceChart = () => {
 
     const clearPriceLines = () => {
       if (!mainSeriesRef.current) return
-      // Only clear trade price lines, not priceLevels
+      // Clear trade price lines
       Object.values(tradePriceLineRefs.current).forEach((line) => {
         try {
           mainSeriesRef.current?.removePriceLine(line)
@@ -713,11 +713,13 @@ export const PriceChart = () => {
   // Create price lines for trades
   useEffect(() => {
     const series = mainSeriesRef.current
-    if (!series || chartMode !== 'candle') {
+    if (!series) return
+    
+    if (chartMode !== 'candle') {
       // Clear trade price lines if not in candle mode
       Object.values(tradePriceLineRefs.current).forEach((line) => {
         try {
-          series?.removePriceLine(line)
+          series.removePriceLine(line)
         } catch {
           /* noop */
         }
@@ -734,15 +736,19 @@ export const PriceChart = () => {
         return
       }
       
-      const line = series.createPriceLine({
-        price: lineConfig.price,
-        color: lineConfig.color,
-        lineStyle: LineStyle.Solid,
-        lineWidth: 2,
-        axisLabelVisible: true,
-        title: lineConfig.label,
-      })
-      tradePriceLineRefs.current[lineConfig.id] = line
+      try {
+        const line = series.createPriceLine({
+          price: lineConfig.price,
+          color: lineConfig.color,
+          lineStyle: LineStyle.Solid,
+          lineWidth: 2,
+          axisLabelVisible: true,
+          title: lineConfig.label,
+        })
+        tradePriceLineRefs.current[lineConfig.id] = line
+      } catch (error) {
+        console.warn('Failed to create price line:', error)
+      }
     })
 
     // Remove lines that no longer exist
